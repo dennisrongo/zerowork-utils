@@ -90,8 +90,8 @@ echo "Setting GDebi as default for .deb files..."
 xdg-mime default gdebi.desktop application/vnd.debian.binary-package
 
 echo "Installing ZeroWork version $ZEROWORK_VERSION..."
-wget "https://github.com/CryptoChrisPy/ZeroWork/releases/download/v$ZEROWORK_VERSION/zerowork-desktop_$ZEROWORK_VERSION-1_amd64.deb"
-sudo apt install "./zerowork-desktop_$ZEROWORK_VERSION-1_amd64.deb" -y
+wget "https://zerowork-agent-releases.s3.amazonaws.com/public/linux/ZeroWork-$ZEROWORK_VERSION.deb"
+sudo apt install "./ZeroWork-$ZEROWORK_VERSION.deb" -y
 
 echo "Restarting XRDP service..."
 sudo systemctl restart xrdp
