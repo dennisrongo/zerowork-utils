@@ -1,19 +1,17 @@
 #!/bin/bash
 
+# Set default ZeroWork version
+ZEROWORK_VERSION="${1:-1.1.60}"
+
 # Disclaimer
 echo "************************************************************"
 echo "* DISCLAIMER:                                              *"
-echo "* This script is created by DEPINspirationHUB (modified by *"
-echo "* codingmenace, and is                                     *"
-echo "* partially AI-generated. It is provided AS-IS without     *"
-echo "* any warranties or guarantees. Use at your own risk.      *"
-echo "* The developers will not be held liable for any           *"
-echo "* issues, damages, or losses caused by running this script.*"
+echo "* This script is created by DEPINspirationHUB and is      *"
+echo "* partially AI-generated. It is provided AS-IS without    *"
+echo "* any warranties or guarantees. Use at your own risk.     *"
+echo "* I (DEPINspirationHUB) will not be held liable for any   *"
+echo "* issues, damages, or losses caused by running this script. *"
 echo "************************************************************"
-
-# ZeroWork version number
-DEFAULT_ZEROWORK_VERSION="1.1.60"
-ZEROWORK_VERSION="${1:-$DEFAULT_ZEROWORK_VERSION}"  # Use argument if provided, else default
 
 # Prompt user to agree to the disclaimer
 read -p "Do you agree to proceed? (y/n): " AGREEMENT
@@ -36,7 +34,7 @@ if [[ "$AGREEMENT" != "y" ]]; then
     exit 1
 fi
 
-echo "Proceeding with the setup..."
+# Proceeding with the setup...
 
 echo "Updating and upgrading system..."
 sudo apt update && sudo apt upgrade -y
@@ -91,12 +89,9 @@ sudo apt install gdebi -y
 echo "Setting GDebi as default for .deb files..."
 xdg-mime default gdebi.desktop application/vnd.debian.binary-package
 
-# Downloading and installing ZeroWork
-echo "Downloading ZeroWork version $ZEROWORK_VERSION..."
-wget https://zerowork-agent-releases.s3.amazonaws.com/public/linux/ZeroWork-$ZEROWORK_VERSION.deb
-
-echo "Installing ZeroWork..."
-sudo gdebi ZeroWork-$ZEROWORK_VERSION.deb -n
+echo "Installing ZeroWork version $ZEROWORK_VERSION..."
+wget "https://github.com/CryptoChrisPy/ZeroWork/releases/download/v$ZEROWORK_VERSION/zerowork-desktop_$ZEROWORK_VERSION-1_amd64.deb"
+sudo apt install "./zerowork-desktop_$ZEROWORK_VERSION-1_amd64.deb" -y
 
 echo "Restarting XRDP service..."
 sudo systemctl restart xrdp
@@ -106,6 +101,7 @@ echo "Use the following credentials:"
 echo "Username: $new_user"
 echo "Password: (You set this during installation)"
 echo "RDP Address: Use your VPS IP address."
+echo "ZeroWork version $ZEROWORK_VERSION has been installed."
 
 # Prompt to delete the script file
 read -p "Do you want to delete the downloaded script file (ubuntu-desktop.sh)? (y/n): " DELETE_FILE
