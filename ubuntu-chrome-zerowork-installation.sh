@@ -3,15 +3,17 @@
 # Disclaimer
 echo "************************************************************"
 echo "* DISCLAIMER:                                              *"
-echo "* This script is created by DEPINspirationHUB and is      *"
-echo "* partially AI-generated. It is provided AS-IS without    *"
-echo "* any warranties or guarantees. Use at your own risk.     *"
-echo "* The developers will not be held liable for any   *"
-echo "* issues, damages, or losses caused by running this script. *"
+echo "* This script is created by DEPINspirationHUB (modified by *"
+echo "* codingmenace, and is                                     *"
+echo "* partially AI-generated. It is provided AS-IS without     *"
+echo "* any warranties or guarantees. Use at your own risk.      *"
+echo "* The developers will not be held liable for any           *"
+echo "* issues, damages, or losses caused by running this script.*"
 echo "************************************************************"
 
 # ZeroWork version number
-ZEROWORK_VERSION="1.1.60"
+DEFAULT_ZEROWORK_VERSION="1.1.60"
+ZEROWORK_VERSION="${1:-$DEFAULT_ZEROWORK_VERSION}"  # Use argument if provided, else default
 
 # Prompt user to agree to the disclaimer
 read -p "Do you agree to proceed? (y/n): " AGREEMENT
