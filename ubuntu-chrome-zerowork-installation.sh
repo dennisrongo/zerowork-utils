@@ -9,8 +9,11 @@ echo "* DISCLAIMER:                                              *"
 echo "* This script is created by DEPINspirationHUB and is      *"
 echo "* partially AI-generated. It is provided AS-IS without    *"
 echo "* any warranties or guarantees. Use at your own risk.     *"
-echo "* I (DEPINspirationHUB) will not be held liable for any   *"
-echo "* issues, damages, or losses caused by running this script. *"
+echo "* The developers will not be held liable for any issues,  *"
+echo "* damages, or losses caused by running this script.       *"
+echo "*                                                          *"
+echo "* This script has been modified by Dennis (codingmenace)  *"
+echo "* to include ZeroWork agent installation.                  *"
 echo "************************************************************"
 
 # Prompt user to agree to the disclaimer
