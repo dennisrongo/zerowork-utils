@@ -84,7 +84,7 @@ wget https://dl.google.com/linux/direct/google-chrome-stable_current_amd64.deb
 sudo apt install ./google-chrome-stable_current_amd64.deb -y
 
 echo "Modifying Chrome launcher to use --no-sandbox..."
-sudo sed -i 's|Exec=/usr/bin/google-chrome-stable %U|Exec=/usr/bin/google-chrome-stable --no-sandbox %U|' /usr/share/applications/google-chrome.desktop
+sudo sed -i 's|Exec=/usr/bin/google-chrome-stable %U|Exec=/usr/bin/google-chrome-stable %U|' /usr/share/applications/google-chrome.desktop
 
 echo "Installing GDebi for easy .deb installations..."
 sudo apt install gdebi -y
