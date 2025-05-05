@@ -1,7 +1,7 @@
 #!/bin/bash
 
 # Set default ZeroWork version
-ZEROWORK_VERSION="${1:-1.1.60}"
+ZEROWORK_VERSION="${1:-1.1.66}"
 
 # Disclaimer
 echo "************************************************************"
