@@ -7,3 +7,8 @@ venv/
 .env.*
 *.pem
 *.key
+zw_access.txt
+zw_refresh.txt
+zw_tree_now.json
+x_tree_now.json
+.DS_Store

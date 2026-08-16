@@ -8,7 +8,10 @@ custom error throws. Drawer: Monaco editor + **Run locally** checkbox.
 Page JS can set the buffer with
 `monaco.editor.getEditors()[0].getModel().setValue(code)`. cua-driver
 UIA `set_value` on Monaco is a no-op — use the type_text recipe in
-[creator-editor-automation.md](creator-editor-automation.md).
+[creator-editor-automation.md](creator-editor-automation.md) only when
+you must type into the drawer yourself. If a human is sitting in the
+Write JS block, give them **one pasteable script** (see Authoring
+below) — do not spend a cycle SendInput-ing thousands of characters.
 
 ## Local vs browser execution
 
@@ -192,6 +195,102 @@ Bypass detection: uploads ≳ 50 MB blocked; some launch/context options
 ignored. SOCKS5 auth is not supported. Do not combine headless + keepAlive.
 Sticky: one live browser per profile id; attach ignores browser-level
 launch options.
+
+## Authoring for a human in the Write JS drawer
+
+The drawer buttons **Copy table or variable reference** and
+**Copy AI instructions** exist so a human can paste the official
+prompt into an agent and get a script back. That prompt is the
+authoring contract. When the user pastes it (or is already
+inside Write JS), follow it — do not invent a second `zw`
+surface.
+
+### Recognize the official prompt
+
+It starts *"You are helping me write code for ZeroWork"* /
+*"I am currently inside the Write JavaScript building block."*
+Then it lists what the block can do, local vs browser, docs URLs,
+getRef/setRef rules, and a **My references** footer. Treat that
+paste as this section, not as a generic coding request.
+
+### What the official prompt asserts
+
+- `import` and `require()` auto-install (no `npm install`). That
+  is **local-only**. Browser execution of `require` / `import`
+  throws `ReferenceError: require is not defined`. To use a
+  package in the page: import it in a **local** Write JS block
+  and `context.exposeFunction` it; the next **browser** Write JS
+  block can call that function.
+- Default is **browser** (page DOM, `querySelectorAll`). Opt
+  into local with `// @zw-run-locally` on its **own** first line,
+  or tick **Run locally in the app**. A trailing pragma on a
+  flattened one-liner is **not** honored.
+- Browser-available: `getRef` / `setRef`, `deviceStorage.*`,
+  `delay` / `log` / `logTemp`, `getTaskbotInfo` / `getAgentInfo`.
+  Limited: packages (`exposeFunction`), state
+  (`*.browser.getCopy` / `.commit`, not `.access()`),
+  `browserContext` (`getContextInfo` / `getDefaults` only).
+- `zw.setRef` `value` **must be a string**. `JSON.stringify`
+  objects, `String(...)` everything else. Names are
+  case-sensitive. Always `await` in browser mode or you write a
+  Promise and get "value must be a string".
+- `appendIndex: 0` is the first **appended** row (table already
+  has 3 rows → that write is row 4). Do not put this block
+  inside a Start Repeat when using `appendIndex`.
+- Persist with `zw.log` / table writes. `console.log` is not in
+  Reports.
+- Drawer docs URLs often end in `-upcoming`. The live pages also
+  exist without that suffix — append `.md` to any docs URL.
+
+### My references (live ids)
+
+The prompt ends with this shape (ids are **per bot** — never
+copy example ids from another TaskBot):
+
+```
+My references:
+  - Variables: ref_id: <id>, names: [<var>, …].
+  - Tables:
+    - Table "<table>": ref_id: <id>, names: "<col>", "<col>", ….
+```
+
+Use those `ref_id` + `name` values. Do not guess. If the
+section is missing, `await zw.getTaskbotInfo()` and read
+`tables[].ref_id` / `columnNames` / `variables.ref_id`.
+
+### How to respond (official)
+
+- ONE best solution. Not multiple speculative options.
+- Code that is **directly pasteable** into the Write JS Monaco
+  editor. Short comments only where they help.
+- Correct `await`s. No extra complexity.
+- Need packages, `zw.state.access()`, or
+  `zw.browserContext.launch` / `getActivePage` → first line
+  `// @zw-run-locally` (or tell the user to tick Run locally).
+
+**Do not type the script in via cua-driver** when the user can
+paste. SendInput drops `\n` (LF flatten → `func is not defined`
+/ `r is not defined`), aborts on Unicode, and ignores a trailing
+pragma. That path is a last resort in
+[creator-editor-automation.md](creator-editor-automation.md)
+(Monaco). `zw_canvas.js_crlf` / `js_lines_for_type_text` split a
+file if you must type.
+
+Pasteable harvest scripts (no account table ids — they call
+`zw.getTaskbotInfo()` or take `TABLE` from **My references**):
+[../templates/x_feed_harvest.js](../templates/x_feed_harvest.js),
+[../templates/linkedin_feed_harvest.js](../templates/linkedin_feed_harvest.js).
+
+Official pages (append `.md`):
+
+https://docs.zerowork.io/using-zerowork/using-building-blocks/write-javascript.md
+https://docs.zerowork.io/using-zerowork/using-building-blocks/write-javascript/imports-and-package-management.md
+https://docs.zerowork.io/using-zerowork/using-building-blocks/write-javascript/write-and-read-variables-and-tables.md
+https://docs.zerowork.io/using-zerowork/using-building-blocks/write-javascript/local-and-global-state.md
+https://docs.zerowork.io/using-zerowork/using-building-blocks/write-javascript/device-storage.md
+https://docs.zerowork.io/using-zerowork/using-building-blocks/write-javascript/utilities.md
+https://docs.zerowork.io/using-zerowork/using-building-blocks/write-javascript/browser-context.md
+https://docs.zerowork.io/using-zerowork/using-building-blocks/write-javascript/metadata.md
 
 ## When to pick Write JS vs no-code
 

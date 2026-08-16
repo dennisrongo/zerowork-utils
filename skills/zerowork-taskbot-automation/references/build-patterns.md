@@ -95,7 +95,11 @@ delete_table_data (all rows, optional overwrite)
 `has_media`, `post_type`.
 
 **Write JS (browser, not Run locally):** throw on login, then scroll +
-"See more", then collect cards. Skeleton (no account ids):
+"See more", then collect cards. Full pasteable script (no account
+ids): [../templates/linkedin_feed_harvest.js](../templates/linkedin_feed_harvest.js).
+REST graph: [../templates/linkedin_feed.json](../templates/linkedin_feed.json)
+via [../scripts/zw_assemble.py](../scripts/zw_assemble.py).
+Skeleton:
 
 ```js
 if (/\/login|\/uas\/login|\/checkpoint/i.test(location.href) ||
@@ -154,6 +158,74 @@ scrape back once Agent Chrome has a session.
 **Why not Save Web Element × N:** feed cards are not a stable incremental list.
 XPath `({loop_index})` works for static grids (Pattern 1), not LinkedIn's
 occluded virtualizer.
+
+## Pattern 7 — X/Twitter home-feed scrape (infinite / virtualized)
+
+Prefer **no-code** first (this is official nested-loop pagination with
+Keyboard instead of Click Next). Write JS only if Save WE +
+`{loop_index}` cannot hold a stable card list after scroll.
+
+Name nodes by job and drop sticky notes (not executed) so the canvas
+is the documentation.
+
+```
+Clear previous rows          delete_table_data (all rows)
+→ Launch Chrome (bypass)     launch_browser
+→ Open X home                open_link https://x.com/home
+→ Wait for timeline          sleep 4–6s
+→ Scrape scope               try
+     → Scroll rounds         loop  Standard, Fixed 6
+          → Save visible tweets   loop  Standard, Count article[data-testid=tweet]
+               → Save post URL / author / text / time   save × N, XPath {loop_index}
+          → After tweet loop      continue_after_repeat  (off inner loop)
+               → Page down        keyboard  PageDown / End
+               → Wait for new tweets  sleep 2s
+     → On scrape error       catch → log
+     → After scrape          after_try → remove_duplicate_rows (post_url) → log
+```
+
+**Selectors (XPath, inner `{loop_index}`):**
+
+```
+(//article[@data-testid="tweet"])[{loop_index}]//a[contains(@href,"/status/")]
+(//article[@data-testid="tweet"])[{loop_index}]//*[@data-testid="User-Name"]
+(//article[@data-testid="tweet"])[{loop_index}]//*[@data-testid="tweetText"]
+(//article[@data-testid="tweet"])[{loop_index}]//time
+```
+
+Save-as: **Link** (post_url), **Text** (author, post_text), **Custom
+attribute** `datetime` (posted_at). Skip-if-missing on tweetText
+(media-only posts). Dedup column = `post_url` (never empty).
+
+Each outer round re-saves whatever cards are mounted; Remove
+Duplicates collapses remounts. `item/get_count/` growing across
+rounds (or Live Runs showing PageDown + N unique URLs) is the
+pagination proof.
+
+**Sticky notes to leave on the canvas:** (1) Agent Chrome must be
+signed into X — Creator tab login does not count. (2) Outer N = scroll
+rounds, not tweet count. (3) If mounted card count stays ~6–8 and
+dedupe leaves almost that many, the virtualizer won — then Write JS
+harvest-while-scroll (Pattern 6) is justified.
+
+**When Write JS is required:** Save WE keeps writing the same six
+`post_url`s after PageDown, or Keyboard does not move the X
+scroller. Then harvest-while-scroll + status-id Set (Pattern 6
+shape), still inside Try-Catch. Do not start from Write JS.
+Pasteable script: [../templates/x_feed_harvest.js](../templates/x_feed_harvest.js)
+(`getTaskbotInfo()`, not a copied table id). No-code graph spec:
+[../templates/x_feed_nocode.json](../templates/x_feed_nocode.json).
+
+**Rename:** dblclick the node title, **Ctrl+A**, type the job name,
+Enter. Without Ctrl+A, type_text appends to the default label.
+
+**Live structure:** Demo X Feed Scraper was rebuilt off Write JS onto
+this nested-loop + Keyboard PageDown graph, with sticky notes for
+login / scroll-rounds / virtualizer fallback. Drawer config for the
+new Save WE / inner-loop selectors is the remaining last mile
+(Detect errors will name empty required fields until those are
+SAVEd). Verify with `item/get_count/` + Live Runs PageDown lines,
+not `execution.success`.
 
 ## Working reference bots
 

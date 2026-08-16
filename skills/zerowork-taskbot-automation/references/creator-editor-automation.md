@@ -47,6 +47,28 @@ when the agent is healthy. Those are not dead ends.
 The **creator window** (where you click Run) is not the **agent window**
 (where the TaskBot browses). See [run-and-platform.md](run-and-platform.md)
 "Two Chromes". Helpers: [../scripts/zw_cua.py](../scripts/zw_cua.py).
+Session driver (list windows, rename, fill notes):
+[../scripts/zw_canvas.py](../scripts/zw_canvas.py) —
+`ZW_CUA_PID` + `ZW_CUA_WINDOW_ID`, never a hardcoded hwnd. CLIs:
+[../scripts/zw_rename.py](../scripts/zw_rename.py),
+[../scripts/zw_fill_notes.py](../scripts/zw_fill_notes.py).
+
+### Same Chrome pid, several windows
+
+`list_windows` on the Chrome pid often returns more than the editor.
+A smaller Chrome window (NTP, another tab popped out) can sit **on
+top of** the creator canvas. SendInput then hits that overlay:
+clicks look like they fire, titles do not rename, notes stay
+`"Write a note..."`, drawers never open.
+
+1. `list_windows({pid})` and pick the window whose title is the
+   TaskBot name (`Demo - X Feed Scraper - Google Chrome`), not
+   `"Google Chrome"` or some other tab.
+2. If notes / rename / drawer clicks do nothing, `bring_to_front`
+   that `window_id`. Live: rename and sticky-note type-in started
+   working only after the editor was actually foreground.
+3. Do not assume `pid` alone addresses the creator. Always pass
+   `window_id`.
 
 ### Windows PowerShell + cua-driver
 
@@ -99,6 +121,26 @@ when you need pixels (drawer open / toast).
 4. Live Runs (bottom-right) can cover cards near the bottom of the
    canvas. Click the panel's **Minimize** control, then re-snapshot,
    then click the card.
+5. A click that only **selects** (card shows `ID <n>` + a small
+   settings badge) is not a drawer open. Live: even a 130×130
+   Group, background then **same** index foreground, still only
+   selected — Open Link, Delay, and Write JS alike. Do not spend
+   the rest of the turn repeating that click. Escalate: human
+   click, or page-JS
+   `monaco.editor.getEditors()[0].getModel().setValue` once a
+   human has the drawer open.
+6. SendInput palette-drag can **drop** a new node without
+   auto-opening the drawer. Extra unwired `write_js` husks then
+   overlap Delay / Open Link and steal later clicks. Auto-align
+   or delete extras before retrying.
+7. The card **×** deletes the node. `"Undo delete"` is a short-lived
+   toolbar toast — if it expires, `POST /node/` + `POST /edge/`
+   again. Do not click × while hunting the icon body.
+
+The left rail (Variables / Tables) can open and change hit
+targets. Collapse it with the small chevron Group just left of
+the TaskBot title (~28×28). **Do not** click
+**Back to Main Menu** — that leaves the editor for `/workflows`.
 
 ### Fill + SAVE
 
@@ -125,7 +167,53 @@ when you need pixels (drawer open / toast).
   values. Persistence proof is the toast + a later run, not the REST
   node payload.
 
+### Rename nodes
+
+There is **no REST node rename**. `POST /node/` `data.name` is
+overwritten by the default type label (`"Open Link"`, `"Start Repeat"`).
+`PATCH /connector/<id>/ {name}` renames the **TaskBot**, not a block.
+
+On the canvas (page JS or cua-driver):
+
+1. Zoom until the card is ~100px+ and in view.
+2. **Double-click the title Text** (the `<p>`), not the icon Group.
+   It becomes an `<input>`.
+3. **Ctrl+A** (foreground on Chromium — background is
+   `background_unavailable`), then `type_text` the job name, then
+   Enter.
+4. Re-snapshot. The title must **equal** the new name, not
+   `Delete Data` + the new name glued together.
+
+Without Ctrl+A, type_text **appends**. Live mashed title:
+`"Delete DataClear previous rows"`. Same rule for every node
+(loops, Save WE, Keyboard, Logs).
+
+Proof the rename landed is `GET /get_workflow()` `data.name`,
+not UIA: wrapped titles often do not exact-match the string you
+typed even when REST has the new name.
+
+The creator window must be the actual foreground window among
+that Chrome pid (see "Same Chrome pid, several windows").
+Rename and note type-in were no-ops until `bring_to_front`.
+
+Name nodes by job (`Clear previous rows`, `Page down to load more`).
+Use `sticky_note`s for login / selectors / stop conditions — notes
+are not executed and REST-create as empty `"Write a note..."`.
+Repo CLIs: `python scripts/zw_rename.py --map "Open Link=Open X home"`
+and `python scripts/zw_fill_notes.py --text "..."`.
+
+**Notes that landed (cua-driver):** find the yellow note in the
+screenshot (not the 114px node Group), **double-click** the note
+body, `type_text`, Escape. REST `data.name` stays `None`; the
+visible text survives reload. Single-click can show the color
+toolbar without committing text. Yellow centroids:
+`zw_canvas.yellow_centroids(shot)` / `zw_fill_notes.py --yellow`.
+
 ### Monaco (Write JavaScript)
+
+If a human is in this drawer (or pastes **Copy AI instructions**),
+give one pasteable script — do not type it in. Contract:
+[write-javascript.md](write-javascript.md) "Authoring for a human".
 
 Page JS (when you have it): `monaco.editor.getEditors()[0].getModel().setValue(code)`.
 
@@ -136,11 +224,15 @@ On the paired Chrome via cua-driver (no page JS):
 | UIA `set_value` on Edit `"Editor content"` | Ignored. No Unsaved changes. |
 | Clipboard + Ctrl+V (foreground) | Ctrl+A selects; paste does not replace. |
 | Focus editor → Ctrl+A foreground → `type_text` **without** `element_index`, `delivery_mode: "foreground"`, `delay_ms: 0` | Replaces the buffer. Unsaved changes appears. |
+| `type_text` of a multi-line string | `\n` (LF) is **dropped**. `\r` / CRLF **does** insert a Monaco newline (LinkedIn import landed as 29 lines because the file was CRLF). LF-only flatten looks like `func` / `r is not defined` when `function` / `require` wrap. |
+| Non-ASCII in the payload (em dash, smart quotes) | SendInput can abort after the first Unicode char. Keep Monaco type-ins ASCII. |
 
-`// @zw-run-locally` anywhere in the script is enough to run locally;
-the drawer checkbox is optional if the pragma is present. After a
-foreground type-in, SAVE immediately — do not assume `set_value`
-committed.
+Workarounds that landed: flatten the script to **one line** (no `//` comments — use `/* … */` only if the closer is on the same line), **or** `press_key` Return after each line. For local execution, tick **Run locally in the app** (checkbox). A trailing `// @zw-run-locally` on a flattened one-liner was **not** honored — the block ran as Browser execution and `require` threw `ReferenceError: require is not defined`. A flattened in-page harvest that started with `function txt(...)` executed as `ReferenceError: func is not defined` — do not start a typed-in one-liner with the `function` keyword; prefer `var txt = function (...)` or a short `require` runner plus the checkbox.
+
+`// @zw-run-locally` on its **own** line is enough to run locally; the
+drawer checkbox is the reliable cua-driver path when you cannot insert
+newlines. After a foreground type-in, SAVE immediately — do not assume
+`set_value` committed.
 
 ### Detect errors + Run
 

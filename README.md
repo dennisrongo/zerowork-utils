@@ -14,9 +14,9 @@ What's covered:
 - The undocumented REST API (`taskbot-server.zerowork.io`) — endpoints, auth, node/edge payloads, table and variable creation, and the validator's wiring rules
 - All 44 canonical node types and their internal `type` strings (wrong strings render as dead nodes), plus official-docs operational knowledge (purpose, drawer fields, wiring, when-to-use, gotchas)
 - Selectors, variables vs tables (native / Google Sheets / CSV), dynamic inputs (`{id,name}`, `${}` / `$${}`, spintax), and the scenario → TaskBot construction procedure
-- Write JavaScript `zw.*` API (local vs browser, refs, deviceStorage, state, browserContext, packages)
+- Write JavaScript `zw.*` API (local vs browser, refs, deviceStorage, state, browserContext, packages). Drawer **Copy AI instructions** / **My references** → one pasteable script, not SendInput ([write-javascript.md](skills/zerowork-taskbot-automation/references/write-javascript.md) "Authoring for a human")
 - Canvas and drawer automation via CDP **and** cua-driver on the paired Chrome (Playwright cannot click Run — mixed-content / no native-host pairing)
-- Verified build patterns: native list scraping, nested-loop pagination, try-catch and condition pipelines, Write-JS table writes, browserless HTTP + ChatGPT chains, LinkedIn-style virtualized-feed scrape
+- Verified build patterns: native list scraping, nested-loop pagination, try-catch and condition pipelines, Write-JS table writes, browserless HTTP + ChatGPT chains, LinkedIn-style virtualized-feed scrape, X/Twitter infinite-scroll harvest-while-scroll
 - Run semantics: start/end markers, error signatures, agent / schedule / webhook / reports, account snapshot
 
 ### Layout
@@ -38,12 +38,26 @@ skills/zerowork-taskbot-automation/
 ├── scripts/
 │   ├── zw_helpers.py           # Drop/connect/harvest/run helpers for browser sessions
 │   ├── zw_cua.py               # Parse cua-driver UIA trees; find the ~114px card Group
+│   ├── zw_api.py               # REST client — tokens from ZW_ACCESS / ZW_REFRESH only
+│   ├── zw_inspect.py           # List bots + summarize workflow / table counts
+│   ├── zw_assemble.py          # Create bot + table + nodes + edges from a JSON spec
+│   ├── zw_canvas.py            # Paired-Chrome session (pid/window from env)
+│   ├── zw_rename.py            # Dblclick title, Ctrl+A, type, Enter
+│   ├── zw_fill_notes.py        # Type sticky notes (label or yellow pixels)
 │   └── check_skill_coverage.py # Parses real skill files; asserts every node is documented
 ├── tests/
 │   └── test_skill_coverage_and_helpers.py
 └── templates/
-    └── zw_drag.py              # Reusable palette-drag template
+    ├── zw_drag.py              # Reusable palette-drag template
+    ├── x_feed_harvest.js       # Pasteable X harvest-while-scroll (no table id)
+    ├── linkedin_feed_harvest.js
+    ├── x_feed_nocode.json      # Pattern 7 graph spec
+    └── linkedin_feed.json      # Pattern 6 graph spec
 ```
+
+Tokens, Chrome hwnds, and account ids are **not** in these files. Set
+`ZW_ACCESS` / `ZW_REFRESH` (or `*_FILE`) and `ZW_CUA_PID` /
+`ZW_CUA_WINDOW_ID` in the environment. Never commit `zw_access.txt`.
 
 ### Installing
 
@@ -109,7 +123,7 @@ Use only ZeroWork.io nodes documented in this skill. REST-first assembly; drawer
    - `POST /node/` × N with **canonical** `type` strings. Verify the rendered class is `react-flow__node-<type>` (not `node-default` — that is a dead husk).
    - `POST /edge/` full objects (`id: reactflow__edge-<src>a-<tgt>a`). Validator: exactly one starting block; After Repeat off Start Repeat; catch + after_try off try; non-branch nodes one-out.
    - Reload the editor (new columns appear in drawers only after reload).
-5. **Configure drawers** — no REST write. On the **paired** Chrome (not Playwright): cua-driver loop in [creator-editor-automation.md](skills/zerowork-taskbot-automation/references/creator-editor-automation.md). Monaco ignores UIA `set_value`. SAVE → "Updated successfully". Auto-align, then connect leftover edges (REST preferred).
+5. **Configure drawers** — no REST write. On the **paired** Chrome (not Playwright): cua-driver loop in [creator-editor-automation.md](skills/zerowork-taskbot-automation/references/creator-editor-automation.md). Monaco ignores UIA `set_value`. If a human is in Write JS, give one pasteable script (do not type it in). **Rename:** dblclick the title, Ctrl+A, type, Enter (`PATCH /connector` is the TaskBot name only). SAVE → "Updated successfully". Auto-align, then connect leftover edges (REST preferred).
 6. **Detect errors** — toolbar. The "please wait" toast can linger; Run still starts. Fix every named node id.
 7. **Run** — toolbar `aria-label="Run"` on the Chrome profile the Desktop Agent is paired with. A second/Playwright Chrome reports "Agent offline" even when `:9990` answers. No REST run trigger. Scheduler / webhook need a linked agent and an awake machine.
 8. **Verify** — `GET /execution/` is not enough (`success` / 0 errors can be a swallowed login throw). Also `item/get_count/` (read `cells[].text`) and Live Runs step text. Creator Chrome login ≠ agent Chrome login. A ~1s "success" on a browser bot usually means the browser phase was skipped. There is no REST create-row.

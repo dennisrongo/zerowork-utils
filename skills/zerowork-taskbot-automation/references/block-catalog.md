@@ -694,14 +694,21 @@ See [write-javascript.md](write-javascript.md) for the full `zw` API.
   https://docs.zerowork.io/using-zerowork/using-building-blocks/write-javascript/metadata.md
 - **Purpose:** Custom JS in the TaskBot runtime.
 - **Config / drawer fields:** Monaco; **Run locally** (or
-  `// @zw-run-locally`).
+  `// @zw-run-locally`). Drawer buttons: **Copy table or variable
+  reference**, **Copy AI instructions**. The AI-instructions prompt
+  includes **My references** (`ref_id` + column names) — authoring
+  contract in [write-javascript.md](write-javascript.md).
 - **Wiring / companions:** Single-out. Throws are catchable and land in
   reports. `console.log` is **not** persisted.
 - **When to use vs adjacent:** Bulk `setRef`/`appendIndex`, npm,
   Playwright, device secrets. Prefer no-code for list scrape / HTTP /
   conditions.
 - **Gotchas:** Local vs browser matrix, string-only refs, do not mix
-  `appendIndex` with Start Repeat.
+  `appendIndex` with Start Repeat. `require` / `import` in browser
+  throws `require is not defined`. When a human is in this drawer,
+  one pasteable script — do not SendInput
+  ([write-javascript.md](write-javascript.md) "Authoring for a
+  human").
 
 ---
 
@@ -837,7 +844,10 @@ See [write-javascript.md](write-javascript.md) for the full `zw` API.
 - **When to use vs adjacent:** Documentation on the canvas. Log is for
   run-time messages.
 - **Gotchas:** Not executed. Do not POST `sticky_note` expecting a run
-  step. Markdown rendering is agent ≥ 1.1.75.
+  step. Markdown rendering is agent ≥ 1.1.75. REST-create stays
+  `"Write a note..."`; fill with
+  [../scripts/zw_fill_notes.py](../scripts/zw_fill_notes.py)
+  (label click or yellow double-click). `data.name` stays `None`.
 
 ## Deactivate / shortcuts / inter-block delay
 

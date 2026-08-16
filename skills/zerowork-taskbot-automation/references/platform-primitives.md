@@ -119,6 +119,130 @@ for grid scrapes (see above).
 - Prefer stable attributes (`data-*`, `aria-label`, `type`, role) over hashed
   CSS modules. Prefer loose `*=` over exact class soup.
 
+### Find a selector (live page)
+
+Do this **on the page the TaskBot will see** — usually Agent Chrome after
+login, not only a tab in Creator Chrome. A selector that works while you
+are signed in can return 0 in the agent's incognito window.
+
+1. **Iframe first.** If the control sits in an iframe, Switch Frame
+   before any Click/Save. A "selector not found" on an embedded
+   form/checkout is usually a missing Switch Frame, not a bad CSS string.
+2. **Inspect, don't trust Copy selector.** Right-click → Inspect. Walk
+   up from the text node to the smallest element with a **stable** hook:
+   `data-testid`, `data-urn`, `aria-label`, `role`, `name`, `type`.
+   Chrome's Copy → Copy selector often emits a long `:nth-child` chain
+   that dies on the next render. Copy XPath is the same class of
+   brittle unless you rewrite it as a global predicate (see above).
+3. **Harvest candidates in the console** (page JS, on that document):
+
+   ```js
+   (function (root) {
+     const rows = [];
+     root.querySelectorAll("[data-testid],[data-urn],[aria-label],[role]").forEach((el) => {
+       const hook = el.getAttribute("data-testid")
+         || el.getAttribute("data-urn")
+         || el.getAttribute("aria-label")
+         || el.getAttribute("role");
+       if (!hook) return;
+       const sel = el.dataset.testid
+         ? `[data-testid="${el.dataset.testid}"]`
+         : el.getAttribute("data-urn")
+           ? `[data-urn="${el.getAttribute("data-urn")}"]`
+           : el.getAttribute("aria-label")
+             ? `[aria-label="${el.getAttribute("aria-label")}"]`
+             : `[role="${el.getAttribute("role")}"]`;
+       rows.push({ tag: el.tagName.toLowerCase(), sel, n: root.querySelectorAll(sel).length });
+     });
+     return rows.filter((r, i, a) => a.findIndex((x) => x.sel === r.sel) === i)
+       .sort((a, b) => a.n - b.n)
+       .slice(0, 40);
+   })(document);
+   ```
+
+   Prefer hooks whose `n` matches the job (1 for a click, N for a list).
+4. **Prove** with `document.querySelectorAll(sel)` (CSS only). Then
+   prove **inside one card**: `card.querySelector(inner)` so a list
+   scrape does not grab the first page-wide match every row.
+5. **Pick the block:**
+   - Stable repeating grid, same parent shape → Save Web Element +
+     XPath `{loop_index}` (Pattern 1).
+   - Next/page numbered UI → nested loops (Pattern 2).
+   - Virtualized / infinite feed (cards unmount on scroll: LinkedIn,
+     X/Twitter, Facebook) → Write JS. Collect **while scrolling**; a
+     selector that matches 8 cards at the top can match 0 after the
+     virtualizer recycles the DOM. Do **not** use `{loop_index}` here.
+6. **When you have no page JS** (cua-driver on Creator Chrome cannot
+   `execute_javascript` in standard mode): UIA names are not CSS. Open
+   the **target site** in a tab you can console, or drop a temporary
+   Write JS that `zw.log`s `querySelectorAll(sel).length` and run it
+   on Agent Chrome. `query_dom` only sees simple tags (`article`,
+   `a`, `button`) — not `[data-testid]`.
+7. **ZeroWork copy-selector helper** (drawer button) is official; treat
+   its output like DevTools Copy — rewrite hashed/nth chains before
+   SAVE. Unverified as an automation target this session.
+
+**Infinite / virtualized scroll (Write JS):** keep a `Set` of stable
+ids (`data-urn`, `/status/123`). Each round: read currently mounted
+cards → add unseen ids → scroll → `zw.delay` 1–2s. Stop when **no new
+ids** for 2–3 consecutive rounds **or** you hit a cap (e.g. 40).
+Writing only after the last scroll misses everything the virtualizer
+already unmounted. Dedup column = that same id, never empty.
+
+How to tell a feed is virtualized (do not use `{loop_index}`):
+
+- Mounted card count stays roughly constant while you scroll (8–15
+  `article`s) even though more posts exist.
+- Cards sit in recycle wrappers (`[data-testid="cellInnerDiv"]` on X,
+  `occludable-update` on LinkedIn) that unmount off-screen.
+- There is no Next / page-number control — only more content as you
+  scroll, sometimes a **Show more posts** / **Retry** chip.
+
+**Find the real scroller.** `window.scrollBy` / `document.body.scrollHeight`
+is a no-op on many X layouts. Walk up from
+`[data-testid="primaryColumn"]` (or the first card) until
+`overflow-y` is `auto|scroll|overlay` **and**
+`scrollHeight > clientHeight + 80`. Also `scrollIntoView` the last
+mounted card. Click **Show more posts** / **Retry** when present.
+
+**Prove pagination worked** (not just "N cards exist"):
+
+```
+scroll round 1 mounted=6 added=6 total=6
+scroll round 2 mounted=7 added=5 total=11
+scroll round 3 mounted=6 added=4 total=15
+```
+
+`rounds > 1` **and** `added > 0` after a scroll is the proof. Log that
+string with `zw.log` so Live Runs shows it. A single harvest after one
+`scrollTo(bottom)` is not infinite-scroll handling.
+
+**X/Twitter stable hooks** (prefer these over hashed classes):
+
+| Job | Selector |
+|---|---|
+| Card | `article[data-testid="tweet"]` |
+| Recycle wrapper | `[data-testid="cellInnerDiv"]` |
+| Author block | `[data-testid="User-Name"]` |
+| Body | `[data-testid="tweetText"]` |
+| Stable id | `a[href*="/status/"]` → `/status/(\d+)` |
+| Time | `time[datetime]` |
+| Counts | `[data-testid="reply"|"retweet"|"like"|"views"]` `aria-label` |
+| Login wall | `/i/flow/login`, `[data-testid="loginButton"]` |
+
+Harvest **inside** the card (`card.querySelector(...)`) so engagement
+counts do not leak from the first tweet on the page.
+
+8. **Temporary probe block.** When you cannot open DevTools on Agent
+   Chrome, a one-shot Write JS that only
+   `zw.log(document.querySelectorAll(sel).length)` + `location.href`
+   is the cheapest selector proof. Delete it after.
+
+**cua-driver / Monaco note:** `type_text` drops `\n`. Flatten harvest
+JS to one line and do **not** start it with `//` (that comments out
+the rest). Tick **Run locally** if you need `require`/`fs`; a trailing
+`// @zw-run-locally` on a one-liner was not honored.
+
 ## Dynamic inputs
 
 - **Official:** https://docs.zerowork.io/using-zerowork/using-building-blocks/dynamic-inputs.md

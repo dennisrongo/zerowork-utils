@@ -4,6 +4,12 @@ Base: `https://taskbot-server.zerowork.io` · Auth: `Authorization: Bearer <loca
 (in-page `fetch` from a creator.zerowork.io tab; 401 "token not valid" = expired → reload the app
 page, it self-refreshes). js() runs work on hidden tabs; CDP *input* does not.
 
+Repo helper (no tokens in source): [../scripts/zw_api.py](../scripts/zw_api.py).
+Set `ZW_ACCESS` or `ZW_ACCESS_FILE`. Refresh with `ZW_REFRESH` /
+`ZW_REFRESH_FILE` via `POST /auth/token/refresh/`. Never reconstruct or re-sign a JWT from decoded claims.
+Never commit `zw_access.txt`. Inspect: [../scripts/zw_inspect.py](../scripts/zw_inspect.py).
+Assemble a spec: [../scripts/zw_assemble.py](../scripts/zw_assemble.py).
+
 ## Nodes & edges (create-only — no PUT/PATCH/DELETE anywhere, all 405)
 
 - `POST /connector/<botId>/node/` — `{type, data: {name}, position: {x, y}, deletable: true, zIndex: 1}`.
@@ -33,7 +39,10 @@ page, it self-refreshes). js() runs work on hidden tabs; CDP *input* does not.
    to attach an existing table to another bot (405) — always create fresh per bot.
 4. Reload the editor → configure drawers (paired-Chrome cua-driver, or
    page-JS setters — [creator-editor-automation.md](creator-editor-automation.md))
-   → "Detect errors" → Run. Rename: `PATCH /connector/<id>/ {name}` (200 "Ok").
+   → "Detect errors" → Run. Rename the **TaskBot**:
+   `PATCH /connector/<id>/ {name}` (200 "Ok"). That does **not**
+   rename nodes — `data.name` is overwritten on create; UI recipe in
+   [creator-editor-automation.md](creator-editor-automation.md).
 
 ## Tables, variables, items
 
