@@ -12,26 +12,34 @@ An agent skill that lets an AI agent (or serves as reference documentation for a
 What's covered:
 
 - The undocumented REST API (`taskbot-server.zerowork.io`) — endpoints, auth, node/edge payloads, table and variable creation, and the validator's wiring rules
-- All 44 canonical node types and their internal `type` strings (wrong strings render as dead nodes)
+- All 44 canonical node types and their internal `type` strings (wrong strings render as dead nodes), plus official-docs operational knowledge (purpose, drawer fields, wiring, when-to-use, gotchas)
+- Selectors, variables vs tables (native / Google Sheets / CSV), dynamic inputs (`{id,name}`, `${}` / `$${}`, spintax), and the scenario → TaskBot construction procedure
+- Write JavaScript `zw.*` API (local vs browser, refs, deviceStorage, state, browserContext, packages)
 - Canvas and drawer automation via CDP — palette drags, edge connections, MUI/React/Monaco field gotchas
 - Verified build patterns: native list scraping, nested-loop pagination, try-catch and condition pipelines, Write-JS table writes, browserless HTTP + ChatGPT chains
-- Run semantics: start/end markers, error signatures, variable-vs-table writes, estate audits
+- Run semantics: start/end markers, error signatures, agent / schedule / webhook / reports, account snapshot
 
 ### Layout
 
 ```
 skills/zerowork-taskbot-automation/
-├── SKILL.md                    # Entry point: safety checks, agent lifecycle, build paths
+├── SKILL.md                    # Entry point: safety, agent lifecycle, construction procedure
 ├── references/
 │   ├── rest-api.md             # Undocumented REST API + validator wiring rules
-│   ├── node-types.md           # All 44 canonical node type strings
-│   ├── block-catalog.md        # Per-block drawer fields and MUI traps
+│   ├── node-types.md           # All 44 canonical type strings + official docs URLs
+│   ├── block-catalog.md        # Per-node purpose, fields, wiring, when-to-use, gotchas
+│   ├── platform-primitives.md  # Selectors, variables, tables, dynamic inputs
+│   ├── write-javascript.md     # zw.* API (local vs browser)
+│   ├── run-and-platform.md     # Agent, run settings, scheduler, webhooks, reports
 │   ├── build-patterns.md       # Verified TaskBot patterns (pagination, try-catch, …)
 │   ├── run-semantics.md        # Run markers, error signatures, data writes, audits
 │   ├── creator-editor-automation.md  # Canvas/drawer automation via CDP
 │   └── playwright-recreation-map.md  # Recreating ZeroWork flows in Playwright
 ├── scripts/
-│   └── zw_helpers.py           # Drop/connect/harvest/run helpers for browser sessions
+│   ├── zw_helpers.py           # Drop/connect/harvest/run helpers for browser sessions
+│   └── check_skill_coverage.py # Parses real skill files; asserts every node is documented
+├── tests/
+│   └── test_skill_coverage_and_helpers.py
 └── templates/
     └── zw_drag.py              # Reusable palette-drag template
 ```
@@ -55,7 +63,72 @@ Or copy the `skills/zerowork-taskbot-automation/` folder manually into your agen
 - **Hermes Agent** — your profile's `skills/` directory (e.g. `%LOCALAPPDATA%\hermes\profiles\<profile>\skills\automation\`)
 - **Claude Code / other agents** — the project or user skills directory your agent scans (e.g. `.claude/skills/`)
 
-The skill auto-activates on ZeroWork-related requests; see its `SKILL.md` for triggers and safety rules (including account-verification steps before touching a logged-in session).
+The skill auto-activates on ZeroWork-related requests. If you are reading this on GitHub and have not installed it into an agent, treat **`skills/zerowork-taskbot-automation/SKILL.md`** as the entry point and follow the procedure below. The `references/` files are the depth; you do not need a local agent install to *design* a TaskBot from them.
+
+### Using the skill from this repo (GitHub)
+
+This repo **is** the skill. There is no separate package. Clone or browse:
+
+```
+https://github.com/dennisrongo/zerowork-utils/tree/master/skills/zerowork-taskbot-automation
+```
+
+1. Read `SKILL.md` first (safety + procedure). **Never assume a logged-in creator.zerowork.io session is yours** — open `/workflows` and confirm the TaskBot list before creating anything.
+2. Pick blocks from [`references/block-catalog.md`](skills/zerowork-taskbot-automation/references/block-catalog.md) (canonical `type` strings in [`node-types.md`](skills/zerowork-taskbot-automation/references/node-types.md)).
+3. Design data and selectors with [`platform-primitives.md`](skills/zerowork-taskbot-automation/references/platform-primitives.md).
+4. Assemble REST-first with [`rest-api.md`](skills/zerowork-taskbot-automation/references/rest-api.md). Drawer writes have no REST (websocket only).
+5. Run/verify with [`run-and-platform.md`](skills/zerowork-taskbot-automation/references/run-and-platform.md) and [`run-semantics.md`](skills/zerowork-taskbot-automation/references/run-semantics.md).
+6. Copy a verified shape from [`build-patterns.md`](skills/zerowork-taskbot-automation/references/build-patterns.md) when the scenario matches (paginated scrape, try-catch + conditions, browserless HTTP).
+
+To have an AI agent build from this repo without `npx skills add`, point it at that folder and say: follow `SKILL.md`, then the construction procedure.
+
+### Scenario → TaskBot construction procedure
+
+Use only ZeroWork.io nodes documented in this skill. REST-first assembly; drawers for config the API cannot write.
+
+1. **Decompose** the scenario into navigate / interact / decide / repeat / persist / notify / (optional) HTTP or JS. Name the outcome ("N rows in table X", "form submitted or error emailed").
+2. **Choose blocks** from the [block catalog](skills/zerowork-taskbot-automation/references/block-catalog.md):
+   - Open a URL → `open_link` (add `launch_browser` only if sticky / proxy / bypass / scripts must change first).
+   - List scrape → Standard `loop` + `save` with `{loop_index}` (XPath for grids).
+   - Enrich existing rows → Dynamic `loop` + `open_link` (URL column) + `save`.
+   - Pagination → outer Standard `loop` (pages) → inner `loop` (items) → `continue_after_repeat` off the **inner** opener → `click` Next.
+   - Optional web element → `check` (Found / Not Found), not a Set Condition.
+   - Data tests → `check_dynamic_data` + N `conditionNode` (one operator each, include **Else**). Sanitize numbers (`math` Remove format) before `<` `>`.
+   - Recoverable failure → `try` + body; `catch` and `after_try` **both off `try`**.
+   - Browserless API → `update_or_configure_api` → `math` / `format_data` / `regex` → `log` / `email` / `ask_chatgpt`.
+   - Custom / npm / Playwright / secrets → `write_js` with `// @zw-run-locally`.
+   - Sub-bot (agent ≥ 1.1.75) → `run_taskbot`; older fire-and-forget → HTTP to a webhook.
+3. **Data model** ([platform primitives](skills/zerowork-taskbot-automation/references/platform-primitives.md)):
+   - One-value scratch (counter, flag, cleaned price) → variable on the auto Variables table.
+   - Many rows → native table (default). Google Sheets only if a human must share/filter outside ZeroWork. CSV import creates a native table.
+   - REST: `POST /data_group/` `{name, type:'NATIVE', columns:[{colName}…], connector_id}`. Tables are **per-bot** — never reuse another bot's table id.
+   - Overwrite each run → `delete_table_data` (all rows) **before** the Standard loop. Dedup → `remove_duplicate_rows` **after**.
+4. **Assemble (REST-first)** ([REST API](skills/zerowork-taskbot-automation/references/rest-api.md)):
+   - Create the bot from `/workflows` → New TaskBot.
+   - `POST /node/` × N with **canonical** `type` strings. Verify the rendered class is `react-flow__node-<type>` (not `node-default` — that is a dead husk).
+   - `POST /edge/` full objects (`id: reactflow__edge-<src>a-<tgt>a`). Validator: exactly one starting block; After Repeat off Start Repeat; catch + after_try off try; non-branch nodes one-out.
+   - Reload the editor (new columns appear in drawers only after reload).
+5. **Configure drawers** — React value-setters + placeholder targeting; Monaco for Write JS; SAVE → "Updated successfully". Auto-align, then connect any leftover edges (REST preferred).
+6. **Detect errors** — toolbar. Fix every named node id.
+7. **Run** — toolbar `aria-label="Run"`. Desktop agent must answer `http://localhost:9990`. There is no REST run trigger. Scheduler / webhook need a linked agent and an awake machine.
+8. **Verify** — `GET /execution/` (`result`, `errors_count`, `run_duration`) plus table rows and Log interpolation. A ~1s "success" on a browser bot usually means the browser phase was skipped.
+
+Hard wiring rules that fail Detect errors if you get them wrong:
+
+- After Repeat and On-Catch / After-Try wire **directly off their opener**, never after the last body block.
+- Set Condition has **one** output. Multi-branch = several Set Condition blocks off one Start Condition.
+- Start Repeat may have multiple outgoing edges; almost every other block may not.
+
+### Coverage check
+
+From the repo root:
+
+```bash
+python skills/zerowork-taskbot-automation/scripts/check_skill_coverage.py
+python -m unittest skills/zerowork-taskbot-automation/tests/test_skill_coverage_and_helpers.py -v
+```
+
+This parses the real skill markdown and asserts every palette `type` and official building-block URL has purpose, config, wiring, when-to-use, and gotchas.
 
 ## Install ZeroWork on Ubuntu (VPS)
 

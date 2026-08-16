@@ -8,17 +8,46 @@ Then:
     zw_harvest(['Open','Link'])                 # drop + dump drawer + delete
     zw_drop_capture(['Write','JavaScript'])     # drop (returns payload string)
     zw_dump_drawer()                            # JSON of open drawer
-    zw_delete('10446898')                       # delete node by data-id
+    zw_delete('<nodeId>')                       # delete node by data-id
     zw_canvas_ids()                             # current node ids
     zw_set_textarea("document.querySelector('textarea')", 'value')
     zw_save_drawer()                            # click SAVE + check toast
     zw_connect(src_id, tgt_id)                  # trusted CDP drag (tab must be VISIBLE)
     zw_run()                                    # click Run toolbar button
 
-NOTE: there is NO auto-align control. Earlier builds clicked (214,876) which is
-actually "toggle interactivity". Fix layout by CDP-dragging nodes or dropping at
-planned coordinates.
+Auto-align DOES exist: bottom-left React Flow controls
+(".react-flow__controls-button", tooltips "Auto-align top to bottom" /
+"left to right"). Prefer that over guessing canvas coordinates — a click
+near (214,876) hits "toggle interactivity", not align. Official:
+docs.zerowork.io/.../building-block-options/auto-align.md
+
+Edges: prefer REST POST /connector/<id>/edge/ over CDP. The creator is not
+"no API" — node/edge/table/rename are REST; drawer SAVE is websocket-only.
 """
+
+def zw_edge_payload(source_id, target_id, source_handle="a", target_handle="a"):
+    """REST body for POST /connector/<botId>/edge/. Full object or the API 400s."""
+    src, tgt = str(source_id), str(target_id)
+    return {
+        "id": "reactflow__edge-%s%s-%s%s" % (src, source_handle, tgt, target_handle),
+        "source": src,
+        "target": tgt,
+        "sourceHandle": source_handle,
+        "targetHandle": target_handle,
+        "type": "buttonEdge",
+        "deletable": False,
+        "zIndex": 1,
+    }
+
+
+def zw_auto_align_selectors():
+    """Official Auto-align controls (they exist). Do not click raw (214,876)."""
+    return {
+        "button": ".react-flow__controls-button",
+        "top_to_bottom": "Auto-align top to bottom",
+        "left_to_right": "Auto-align left to right",
+    }
+
 
 def zw_canvas_ids():
     return js("Array.from(document.querySelectorAll('.react-flow__node')).map(n => n.getAttribute('data-id'))")

@@ -44,7 +44,7 @@ https://docs.zerowork.io/llms.txt — every page available as markdown by append
 ## The 5 real gaps (and fixes)
 1. **Anti-detection** — vanilla Playwright is fingerprintable (CDP, `navigator.webdriver`). Fix: patchright, playwright-extra + stealth, or camoufox (hardened Firefox). Needs ongoing attention; this is ZeroWork's core moat for social automation.
 2. **Regular browser mode** (run in daily Chrome w/ existing logins) → `launchPersistentContext()` on a dedicated profile, or `connectOverCDP()` to Chrome with `--remote-debugging-port` (needs separate user-data-dir on Chrome 149+). Cookies → `storageState` export/import.
-3. **Scheduler / webhooks / concurrency** — wrap runs: node-cron, Windows Task Scheduler, Hermes cron, or the NAS n8n instance (webhook triggers free there).
+3. **Scheduler / webhooks / concurrency** — wrap runs: node-cron, Windows Task Scheduler, or any webhook-capable runner.
 4. **Rate caps per run/hour/day + human pacing** — token-bucket limiter + randomized delays, ~50 lines.
 5. **Visual builder** — none in Playwright. Replacement: YAML task DSL + ~300-line interpreter. Handlers = one function per block type; ctx = {page, tables, vars, limiter}; resume-from-checkpoint = serialize cursor after every step.
 

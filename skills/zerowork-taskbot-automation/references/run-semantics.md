@@ -35,14 +35,14 @@ Setting them (right-click menu) writes `className: 'start'` / `className: 'end'`
 ## Deletion & UI mechanics
 
 - **Drawer config saves over WEBSOCKET, not REST** — a fetch hook catches nothing on SAVE. Drawer-driven config is the only write path; REST covers nodes/edges/tables/columns/renames.
-- Renames: `PATCH /connector/<id>/ {name}` — reliable (verified on 4 bots).
+- Renames: `PATCH /connector/<id>/ {name}` — reliable.
 - Edge deletion (canvas only): real CDP click on `.react-flow__edge-interaction` path + Delete key. `deletable:false` on REST-created edges suppresses the hover ✕ but click+Delete still works. If the edge's nodes are viewport-culled → delete the target node and rewire.
 - `js()` gotcha: NEVER `delete window.fetch` to unhook a fetch spy — fetch becomes undefined and every later call throws. Reload to recover; when hooking, keep the original reference.
 - Run logs are WS-only — no REST endpoint exposes per-run log text; the Reports LOGS button doesn't respond to automation clicks. Verify via `/execution/` result/errors_count + Log interpolation.
 
-# Estate audit (how to snapshot any account)
+# Account snapshot
 
-- All bots: `GET /connector/?page=1..N` (~20/page, 3 pages on a mature account) → id + name.
+- All bots: `GET /connector/?page=1..N` (~20/page) → id + name.
 - Scheduled bots carry a `scheduler` id on the connector object; `GET /scheduler/<id>/` → cron,
   timezone, interval mode. Only bots with schedulers run unattended — everything else is manual.
 - `notify_on_statuses: ['failed']` on a connector = failure emails enabled.

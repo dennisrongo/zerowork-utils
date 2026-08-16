@@ -84,4 +84,4 @@ Keep a set of demo bots in a scratch/test account as living documentation:
 - **HTTP + math pipeline** — Pattern 5, browserless.
 - **Node playground** — drawer-schema harvesting ground; expect dead husks if you
   experiment with type strings.
-- One production bot you trust (read-only) as ground truth for loop wiring.
+- One bot whose loop wiring you already trust (read-only) as a reference.

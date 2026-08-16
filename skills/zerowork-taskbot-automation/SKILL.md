@@ -1,7 +1,7 @@
 ---
 name: zerowork-taskbot-automation
 description: "Use when building, running, or automating ZeroWork TaskBots."
-version: 1.1.0
+version: 1.2.0
 author: Dennis Rongo (@codingmenace)
 license: MIT
 metadata:
@@ -11,7 +11,7 @@ metadata:
 
 # ZeroWork TaskBot Automation
 
-Automate the ZeroWork platform itself: desktop agent lifecycle, building TaskBots in the creator (creator.zerowork.io) via browser automation, connecting blocks, running, and verifying results. Built for programmatic client TaskBot builds by a vetted ZeroWork expert.
+Automate the ZeroWork platform itself: desktop agent lifecycle, building TaskBots in the creator (creator.zerowork.io) via the undocumented REST API plus drawers, connecting blocks, running, and verifying results. Built so an agent can take any automation scenario and assemble it on ZeroWork.io from this skill alone.
 
 ## When to Use
 
@@ -20,10 +20,10 @@ Automate the ZeroWork platform itself: desktop agent lifecycle, building TaskBot
 
 ## SAFETY FIRST: Verify the account BEFORE touching anything
 
-ZeroWork sessions found in a browser may belong to a CLIENT, not to you. (Real incident: an authenticated creator session turned out to be a client workspace; a test TaskBot was created in it before anyone noticed.)
+ZeroWork sessions found in a browser may belong to someone else's workspace, not yours.
 
 1. **Never assume an existing authenticated session is yours.** Navigate to `/workflows` and check the TaskBot list FIRST.
-2. If the bot list doesn't match the account you expect (unfamiliar client-style bot names, missing your known bots) → wrong account → stop and confirm with the account owner.
+2. If the bot list doesn't match the account you expect (unfamiliar names, missing bots you know should be there) → wrong account → stop and confirm with the account owner.
 3. To switch accounts: click "Log out" (clears the local cookie only — harmless), then the owner logs in themselves. Never type credentials.
 4. Navigating to `/login` while authenticated auto-redirects to `/workflows` — log out first.
 
@@ -49,11 +49,21 @@ wire DIRECTLY off their Start node, never chained after siblings; runs trigger o
 (no REST trigger), verify via `GET /execution/`.
 
 Run semantics — persistent start/end markers, 1s-vs-17s error signatures, variable-vs-table
-writes, condition/regex/math block rules, deletion mechanics, and an estate-audit recipe:
+writes, condition/regex/math block rules, deletion mechanics, and an account-snapshot recipe:
 **[references/run-semantics.md]**
 
-Block drawers & field gotchas (all 44 blocks, placeholder-by-placeholder, MUI traps):
+Official run/agent/schedule/webhook/reports/common-problems (and release-note behavior
+that changes building): **[references/run-and-platform.md]**
+
+Block operational catalog (every palette `type` + Save Lists / Enrich Existing Data):
+purpose, drawer fields, wiring/companions, when-to-use, gotchas —
 **[references/block-catalog.md]**
+
+Selectors, `{id, name}` refs, `${}` / `$${}` code-in-inputs, spintax, variables vs
+native/Sheets/CSV tables: **[references/platform-primitives.md]**
+
+Write JavaScript `zw.*` API (local vs browser, setRef/getRef, deviceStorage, state,
+browserContext, packages): **[references/write-javascript.md]**
 
 Verified build patterns — native list scrape (XPath `{loop_index}`), nested-loop pagination,
 Write-JS table writes, try-catch/condition pipelines, browserless HTTP+ChatGPT chains, plus
@@ -61,11 +71,70 @@ the per-bot table-attachment rule: **[references/build-patterns.md]**
 
 Copyable browser_exec helpers (drop/dump/connect/run/save-drawer): **[scripts/zw_helpers.py]**
 — exec into the session after copying to the browser-use workspace:
-`exec(open('zw_helpers.py').read())`.
+`exec(open('zw_helpers.py').read())`. Auto-align **does exist** (React Flow controls);
+prefer it over guessing canvas coordinates.
+
+## Scenario → TaskBot construction procedure
+
+Use **only** ZeroWork.io nodes and primitives documented in this skill. REST-first
+assembly; drawers for config the API cannot write.
+
+1. **Decompose the scenario** into: navigate / interact / decide / repeat / persist /
+   notify / (optional) HTTP or JS. Name the human outcome ("N rows in table X",
+   "form submitted or error emailed").
+2. **Choose blocks** from [block-catalog.md](references/block-catalog.md). Defaults:
+   - Open a URL → `open_link` (add `launch_browser` only if sticky/proxy/bypass/scripts
+     must change before the first page).
+   - List scrape → Standard `loop` + `save` with `{loop_index}` (XPath for grids).
+   - Enrich existing rows → Dynamic `loop` + `open_link` (URL column) + `save`.
+   - Pagination → outer Standard `loop` (pages) → inner `loop` (items) →
+     `continue_after_repeat` off the **inner** opener → `click` Next.
+   - Optional web element → `check` (Found / Not Found), not a Set Condition.
+   - Data tests → `check_dynamic_data` + N `conditionNode` (one operator each, include
+     **Else**). Sanitize numbers (`math` Remove format) before `<` `>`.
+   - Recoverable failure → `try` + body; `catch` and `after_try` **both off `try`**.
+   - Browserless API → `update_or_configure_api` → `math` / `format_data` / `regex` →
+     `log` / `email` / `ask_chatgpt`.
+   - Custom / npm / Playwright / secrets → `write_js` with `// @zw-run-locally`.
+   - Sub-bot (agent ≥ 1.1.75) → `run_taskbot`; older fire-and-forget → HTTP to webhook.
+3. **Design the data model** ([platform-primitives.md](references/platform-primitives.md)):
+   - One-value scratch (counter, flag, cleaned price) → variable on the auto
+     Variables table.
+   - Many rows → native table (default). Sheets only if a human must share/filter
+     outside ZeroWork. CSV import creates a native table.
+   - REST: `POST /data_group/` `{name, type:'NATIVE', columns:[{colName}…], connector_id}`.
+     Tables are **per-bot** — never reuse another bot's table id.
+   - Overwrite-each-run → `delete_table_data` (all rows) **before** the Standard loop.
+   - Dedup → `remove_duplicate_rows` **after** the loop.
+4. **Assemble (REST-first)** ([rest-api.md](references/rest-api.md)):
+   - Create bot from `/workflows` → "New TaskBot".
+   - `POST /node/` × N with **canonical** `type` strings ([node-types.md](references/node-types.md));
+     verify `react-flow__node-<type>` (not `node-default`).
+   - `POST /edge/` full objects. Validator: one starting block; After Repeat off
+     Start Repeat; catch + after_try off try; non-branch nodes one-out.
+   - Reload the editor (new columns appear only after reload).
+5. **Configure drawers** — React setters + placeholder targeting; Monaco for
+   Write JS; SAVE → "Updated successfully". Clear stray `x` helpers.
+   Auto-align, then connect any remaining edges (REST preferred; CDP only if
+   the editor tab is visible).
+6. **Detect errors** — toolbar. Fix every named node id. Structure errors
+   (orphan, companion wired off the body) will also block Run.
+7. **Run** — `aria-label="Run"`. Agent must answer `localhost:9990`. No REST
+   trigger. Scheduler / webhook need a **linked** agent + awake machine.
+8. **Verify** — `GET /execution/` (`result`, `errors_count`, `run_duration`) +
+   table `item/` side-effects + Log interpolation. Duration ~1s success on a
+   browser bot usually means the browser phase was skipped. Clear leftover
+   start/end markers (`className`) before debugging 1s failures.
+
+Worked sketches for (i) paginated list scrape, (ii) form + conditions +
+try-catch, (iii) browserless HTTP → transform → Log/Notify live in
+[build-patterns.md](references/build-patterns.md) (Patterns 2, 4, 5).
 
 ## Creator editor automation — core loop
 
-The creator is React + MUI + React Flow with no API. Full selectors, event sequences, and pitfalls: **[references/creator-editor-automation.md]**. Copyable drag helper: **[templates/zw_drag.py]**.
+The creator is React + MUI + React Flow. Node/edge/table **create** is REST
+(preferred). Drawer field writes have no REST (they go over websocket) — use
+the loop below. Full selectors, event sequences, and pitfalls: **[references/creator-editor-automation.md]**. Copyable drag helper: **[templates/zw_drag.py]**.
 
 1. **Add block** — synthetic HTML5 drag: palette card (`[draggable=true]`, match by innerText) → `dragstart` with `DataTransfer.setData('application/reactflow', '<type>')` (verified: `open_link`) → drop on `div.invisible-drop`. Each drop auto-opens the new block's config drawer.
 2. **Configure** — drawer opens CENTER-screen (not right side). Fill via React prototype value-setters + `input`/`change` events. Write JavaScript uses Monaco: `monaco.editor.getEditors()[0].getModel().setValue(code)`. Click SAVE (button text 'SAVE', toast = "Updated successfully").

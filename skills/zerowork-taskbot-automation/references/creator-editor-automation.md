@@ -60,18 +60,18 @@ cdp('Input.dispatchMouseEvent', type='mouseReleased', x=tx, y=ty, button='left',
 - Node drags (repositioning) also need the same trusted CDP drag on the node body. A CDP node-drag can grab the WRONG node if coordinates are stale — re-read rects immediately before dragging.
 
 ## Deleting nodes
-- Each node has an × button (first `button` in the node) — synthetic click works. BUT: hover-revealed in some states; and one node (10446898) ended up with NO button in DOM after a React-setter save + tab switch (persisted-but-broken render; recovered only by deleting everything around it — it survived as a harmless orphan that still executed fine after auto-align).
+- Each node has an × button (first `button` in the node) — synthetic click works. BUT: hover-revealed in some states; after a React-setter save + tab switch a node can render with NO button in the DOM (persisted-but-broken). Recover by deleting neighbors and rewiring, or delete the orphan if it is unused.
 - App's own delete path: ancestor fiber of the react-flow div exposes `onNodesDelete` → dispatches `D("delete", {triggered:true, data:{ids, prevNodes, prevEdges}})`. Not needed if × buttons work.
 - "Undo delete" appears after deletions.
 
 ## Running + results
 - Run button → validation first ("Checking for disconnected blocks or missing input data"). Failure: lists offending block IDs. Success: browser window opens via desktop agent, blocks execute in edge order, progress streams at body tail.
-- Verified run (3:33 PM): Open Link → Write JavaScript ("Browser execution / Executed custom JavaScript code") → Log ("Scrape finished") → "Your TaskBot ran successfully." ~5s.
+- Verified run: Open Link → Write JavaScript ("Browser execution / Executed custom JavaScript code") → Log ("Scrape finished") → "Your TaskBot ran successfully." ~5s.
 - `/reports` shows step statuses + duration only. Write JavaScript console.log output was NOT found in the report UI or in `%APPDATA%/ZeroWork/Local Storage/leveldb` — if you need extraction output persisted, write it to a ZeroWork table or use Send Notification instead of console.log/return.
 - Agent must be running (`localhost:9990`) or Run fails.
 
-## browser-use CLI notes (this host)
+## browser-use CLI notes
 - `switch_tab(targetId)` rebinds js()/cdp() AND may reset page render state — re-query nodes after switching.
 - `click_at_xy` = SCREEN coordinates, hits the user's foreground app if automation tab isn't frontmost. Avoid in this workflow.
 - `agent_helpers.py` in the workspace is NOT auto-imported — `exec(open('agent_helpers.py').read())`.
-- Terminal hardline: long inline grep one-liners with multiple `-o` patterns got blocked as malformed payload — save to script file via the blocked-scripts recovery path or split the command.
+- Long inline grep one-liners with multiple `-o` patterns can be rejected as a malformed payload — write a script file or split the command.
