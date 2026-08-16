@@ -304,9 +304,11 @@ Full REST wording: [rest-api.md](rest-api.md).
   (agent must be logged in + machine awake). No REST run trigger
   (`/execution/run/` 404).
 - Verify: `GET /execution/?page=1` → `result`, `errors_count`,
-  `run_duration`, `connector_name`. Plus table side-effects
-  (`GET /data_group/<id>/item/`) and Log interpolation. Per-step log text
-  has no REST endpoint.
+  `run_duration`, `connector_name`. Plus table `item/get_count/` (success
+  can still mean catch swallowed a scrape throw) and Log / Live Runs
+  text. Item JSON is `cells[].text` + `column_id`, not a flat `data`
+  object — [rest-api.md](rest-api.md). Per-step log text has no REST
+  endpoint. There is no REST create-row.
 - Duration signature: ~1s success = browserless (or everything skipped);
   7–17s+ = a real browser phase. See [run-semantics.md](run-semantics.md)
   and [run-and-platform.md](run-and-platform.md).

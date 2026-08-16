@@ -22,6 +22,28 @@ Official: https://docs.zerowork.io/install-the-agent.md
 - **Guest Agent** (not logged in) can only do **manual** Run clicks. Scheduler,
   webhook, and Concurrent Runs require a **linked** (logged-in) agent.
 
+### Two Chromes (do not confuse them)
+
+| | **Creator Chrome** | **Agent Chrome** |
+|---|---|---|
+| What it is | The window on `creator.zerowork.io` where you build and click **Run** | The window the Desktop Agent launches to execute browser blocks |
+| Pairing | Must be the profile the agent native-host is paired with | A **separate** profile / cookie jar |
+| LinkedIn (or any) login | Irrelevant to the scrape | This is the session Open Link / Write JS see |
+
+A logged-in site tab in Creator Chrome does **not** log Agent Chrome in.
+Symptom: run `success` / `errors_count: 0`, Live Runs shows the login-throw
+message, table `get_count` is 0 (or only whatever survived Delete Data).
+
+**Cookie transfer from Creator Chrome → Launch Browser JSON** was tried and
+failed as an unattended path: Chrome's Cookies SQLite is exclusively locked
+while Chrome is running (`CreateFile` with `FILE_SHARE_READ` still
+`ERROR_SHARING_VIOLATION`; `esentutl /y` same). Extension popups
+(EditThisCookie and similar) often have **no UIA tree**. Do not burn a
+cycle on DB copy. Working options: a human Cookie-Editor export pasted
+into Launch Browser / TaskBot Settings, or a **sticky** profile signed in
+once inside the agent window (Stay on page helps that first session).
+Never type site credentials. Never commit cookie JSON.
+
 ### Log in to the Agent
 
 Required once before Scheduler or Webhook will fire on that machine.
@@ -198,6 +220,7 @@ Official hub: https://docs.zerowork.io/using-zerowork/common-problems.md
 | Insert Text drops first letters | Site wasn't ready; Click the field first, or slow the typing speed, or add a short Delay. |
 | More than one starting block | Orphan node (deleted upstream). Delete or reconnect. After Repeat / Catch wired off the body instead of the opener also produces structure errors. |
 | Does not auto-scroll | Standard "continue until no element" + auto-scroll can fail on custom virtual lists. Keyboard ArrowDown / Space, or Click a "Load more". |
+| Run success / 0 errors but table empty | Try-Catch swallowed a login or 0-card throw; or Remove Duplicates keyed on an empty column. Check Live Runs + `item/get_count/`. Creator Chrome login does not count. |
 
 Start-failure (agent / invalid setup) is **not** catchable by Try-Catch even
 if you wrap the whole canvas.

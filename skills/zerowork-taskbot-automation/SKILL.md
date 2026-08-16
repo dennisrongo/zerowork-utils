@@ -1,7 +1,7 @@
 ---
 name: zerowork-taskbot-automation
 description: "Use when building, running, or automating ZeroWork TaskBots."
-version: 1.2.0
+version: 1.3.0
 author: Dennis Rongo (@codingmenace)
 license: MIT
 metadata:
@@ -71,8 +71,10 @@ the per-bot table-attachment rule: **[references/build-patterns.md]**
 
 Copyable browser_exec helpers (drop/dump/connect/run/save-drawer): **[scripts/zw_helpers.py]**
 — exec into the session after copying to the browser-use workspace:
-`exec(open('zw_helpers.py').read())`. Auto-align **does exist** (React Flow controls);
-prefer it over guessing canvas coordinates.
+`exec(open('zw_helpers.py').read())`. Paired-Chrome cua-driver helpers
+(parse UIA tree, find the ~114px card Group): **[scripts/zw_cua.py]**.
+Auto-align **does exist** (React Flow controls); prefer it over guessing
+canvas coordinates.
 
 ## Scenario → TaskBot construction procedure
 
@@ -107,28 +109,45 @@ assembly; drawers for config the API cannot write.
    - Overwrite-each-run → `delete_table_data` (all rows) **before** the Standard loop.
    - Dedup → `remove_duplicate_rows` **after** the loop.
 4. **Assemble (REST-first)** ([rest-api.md](references/rest-api.md)):
-   - Create bot from `/workflows` → "New TaskBot".
+   - Create bot: `POST /connector/` `{name}` (or `/workflows` → "New TaskBot").
    - `POST /node/` × N with **canonical** `type` strings ([node-types.md](references/node-types.md));
-     verify `react-flow__node-<type>` (not `node-default`).
+     verify `react-flow__node-<type>` (not `node-default`). Custom `data.name`
+     is overwritten by the default type label.
    - `POST /edge/` full objects. Validator: one starting block; After Repeat off
      Start Repeat; catch + after_try off try; non-branch nodes one-out.
    - Reload the editor (new columns appear only after reload).
-5. **Configure drawers** — React setters + placeholder targeting; Monaco for
-   Write JS; SAVE → "Updated successfully". Clear stray `x` helpers.
-   Auto-align, then connect any remaining edges (REST preferred; CDP only if
-   the editor tab is visible).
-6. **Detect errors** — toolbar. Fix every named node id. Structure errors
-   (orphan, companion wired off the body) will also block Run.
-7. **Run** — `aria-label="Run"`. Agent must answer `localhost:9990`. No REST
-   trigger. Scheduler / webhook need a **linked** agent + awake machine.
-8. **Verify** — `GET /execution/` (`result`, `errors_count`, `run_duration`) +
-   table `item/` side-effects + Log interpolation. Duration ~1s success on a
-   browser bot usually means the browser phase was skipped. Clear leftover
-   start/end markers (`className`) before debugging 1s failures.
+5. **Configure drawers** — no REST write. On the **paired** Chrome window
+   (not Playwright): cua-driver loop in
+   [creator-editor-automation.md](references/creator-editor-automation.md)
+   (helpers: [scripts/zw_cua.py](scripts/zw_cua.py)). Snapshot → click the
+   ~114px Group parent of the node label (`foreground` only after a
+   background no-op) → `set_value` / MUI ListItem → SAVE → "Updated
+   successfully". Monaco ignores UIA `set_value` — type_text recipe in
+   that file. Clear stray `x` helpers. Auto-align, then connect remaining
+   edges (REST preferred).
+6. **Detect errors** — toolbar. The "please wait" toast can linger; Run
+   still starts. Fix every named node id. Structure errors (orphan,
+   companion wired off the body) also block Run.
+7. **Run** — `aria-label="Run"` **from the Chrome profile the Desktop Agent
+   is paired with**. A Playwright / fresh Chrome window on the same machine
+   will say "Your Desktop Agent is offline" even when `localhost:9990`
+   answers — the creator page cannot `fetch` http://127.0.0.1 from HTTPS
+   and has no native-host pairing. No REST trigger. Scheduler / webhook
+   need a **linked** agent + awake machine.
+8. **Verify** — `GET /execution/` (`result`, `errors_count`, `run_duration`)
+   is not enough: Try-Catch can swallow a login/scrape throw and still
+   report success / 0 errors. Also `GET /data_group/<id>/item/get_count/`
+   (read `cells[].text`, not a flat `data` dict) + Live Runs step text.
+   Duration ~1s success on a browser bot usually means the browser phase
+   was skipped. Creator Chrome login ≠ agent Chrome login
+   ([run-and-platform.md](references/run-and-platform.md)). Clear leftover
+   start/end markers (`className`) before debugging 1s failures. There is
+   no REST create-row.
 
 Worked sketches for (i) paginated list scrape, (ii) form + conditions +
-try-catch, (iii) browserless HTTP → transform → Log/Notify live in
-[build-patterns.md](references/build-patterns.md) (Patterns 2, 4, 5).
+try-catch, (iii) browserless HTTP → transform → Log/Notify, (iv) LinkedIn-
+style virtualized feed live in
+[build-patterns.md](references/build-patterns.md) (Patterns 2, 4, 5, 6).
 
 ## Creator editor automation — core loop
 
@@ -137,7 +156,7 @@ The creator is React + MUI + React Flow. Node/edge/table **create** is REST
 the loop below. Full selectors, event sequences, and pitfalls: **[references/creator-editor-automation.md]**. Copyable drag helper: **[templates/zw_drag.py]**.
 
 1. **Add block** — synthetic HTML5 drag: palette card (`[draggable=true]`, match by innerText) → `dragstart` with `DataTransfer.setData('application/reactflow', '<type>')` (verified: `open_link`) → drop on `div.invisible-drop`. Each drop auto-opens the new block's config drawer.
-2. **Configure** — drawer opens CENTER-screen (not right side). Fill via React prototype value-setters + `input`/`change` events. Write JavaScript uses Monaco: `monaco.editor.getEditors()[0].getModel().setValue(code)`. Click SAVE (button text 'SAVE', toast = "Updated successfully").
+2. **Configure** — drawer opens CENTER-screen (not right side). Fill via React prototype value-setters + `input`/`change` events when you have page JS; otherwise the cua-driver loop in [creator-editor-automation.md](references/creator-editor-automation.md). Write JavaScript / Monaco: page JS `monaco.editor.getEditors()[0].getModel().setValue(code)` — UIA `set_value` does not work. Click SAVE (button text 'SAVE', toast = "Updated successfully").
 3. **Connect blocks (trusted input ONLY)** — React Flow's d3-drag ignores synthetic events. Must (a) `switch_tab(targetId)` so the editor tab is VISIBLE (trusted CDP input fails on hidden tabs), then (b) CDP `Input.dispatchMouseEvent` drag: source `.react-flow__handle-bottom` → target `.react-flow__handle-top`. Unconnected blocks fail validation ("more than one starting building block"); edges must run top-to-bottom / left-to-right.
 4. **Auto-align** — bottom-left control ("Auto-align top to bottom", a react-flow controls button) fixes messy layouts in one click. Prefer it over dragging nodes.
 5. **Rename** — dblclick the title `<p>` → it becomes an `<input>` → set value + Enter. (Or `PATCH /connector/<id>/ {name}` via REST.)

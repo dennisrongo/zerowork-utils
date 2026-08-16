@@ -13,6 +13,10 @@ Setting them (right-click menu) writes `className: 'start'` / `className: 'end'`
 - **~1 second + success** = browserless bot (HTTP/math/log pipeline) OR browser blocks all skipped/deactivated. Browser runs take 7–17s+. Use duration to distinguish "config skipped everything" from "actually executed".
 - ~1 second + error = persistent marker misdirecting the start, or an orphaned-node structure error.
 - 17–19s + error = executed the browser phase then failed in a data block (regex/condition/update).
+- **Any duration + success + `errors_count: 0` is not proof of table rows.**
+  Try-Catch swallows a step throw (login page, 0 cards) and the run is still
+  Success. Always read `GET /data_group/<id>/item/get_count/` and Live Runs
+  step text. See [rest-api.md](rest-api.md) for the `cells` shape.
 
 ## Variable semantics
 

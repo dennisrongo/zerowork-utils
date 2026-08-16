@@ -5,7 +5,10 @@ Official: https://docs.zerowork.io/using-zerowork/using-building-blocks/write-ja
 Use this block when no-code cannot express the step: npm packages, bulk
 table writes, Playwright-level browser control, device-local secrets, or
 custom error throws. Drawer: Monaco editor + **Run locally** checkbox.
-Configure via `monaco.editor.getEditors()[0].getModel().setValue(code)`.
+Page JS can set the buffer with
+`monaco.editor.getEditors()[0].getModel().setValue(code)`. cua-driver
+UIA `set_value` on Monaco is a no-op — use the type_text recipe in
+[creator-editor-automation.md](creator-editor-automation.md).
 
 ## Local vs browser execution
 
@@ -66,6 +69,13 @@ await zw.setRef({ ref_id: dgId, name: "title", value: String(text), appendIndex:
   `getRef` per known name. Variables are not rows — `item/` count stays 0.
 - Always `await` `setRef` in browser execution or you write a Promise and
   get "value must be a string".
+- There is no REST create-row ([rest-api.md](rest-api.md)). Local Write JS
+  (`// @zw-run-locally`) may `fs.readFileSync` a **device** JSON and
+  `setRef` it — useful only as a last resort when Agent Chrome has no
+  site session and the rows already exist on disk. Do not commit that
+  file. Prefer the in-page scrape once a sticky/cookie session exists.
+- `appendIndex` rows that share an empty dedupe column collapse to one
+  row at Remove Duplicates. Write a unique key per row.
 
 ## Device storage
 

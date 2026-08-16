@@ -8,6 +8,8 @@ page, it self-refreshes). js() runs work on hidden tabs; CDP *input* does not.
 
 - `POST /connector/<botId>/node/` — `{type, data: {name}, position: {x, y}, deletable: true, zIndex: 1}`.
   Node rows are ~200 y-units apart in canvas coordinates. Valid types: see node-types.md.
+  Custom `data.name` is overwritten by the default type label ("Open Link", not
+  your title). Drawer config is still websocket-only — it is not in `get_workflow()`.
 - `POST /connector/<botId>/edge/` — FULL object or 400 "Required data was not provided":
   `{id: 'reactflow__edge-<src>a-<tgt>a', source, target, sourceHandle: 'a', targetHandle: 'a', type: 'buttonEdge', deletable: false, zIndex: 1}`
 - `GET /connector/<botId>/get_workflow/` — ground truth for nodes + edges. Never trust the canvas
@@ -22,13 +24,16 @@ page, it self-refreshes). js() runs work on hidden tabs; CDP *input* does not.
 
 ## Workflow assembly (REST-first — minutes, not canvas hours)
 
-1. Create bot: `/workflows` list → js-click "New TaskBot" → id from redirect URL.
+1. Create bot: `POST /connector/` `{name}` → `{id, name, variables_id}` (200).
+   (The `/workflows` "New TaskBot" button does the same.) `POST /auth/token/refresh/`
+   `{refresh}` returns a new `access` JWT when the stored access token is expired.
 2. `POST /node/` × N (grid positions), `POST /edge/` × chain.
 3. `POST /data_group/` `{name, type: 'NATIVE', columns: [{colName}...], connector_id}` — creates
    AND attaches a table with columns in one call. Tables are per-bot instances; there is NO route
    to attach an existing table to another bot (405) — always create fresh per bot.
-4. Reload the editor → configure drawers (CDP mouse + React prototype value-setters) →
-   "Detect errors" → Run. Rename: `PATCH /connector/<id>/ {name}` (200 "Ok").
+4. Reload the editor → configure drawers (paired-Chrome cua-driver, or
+   page-JS setters — [creator-editor-automation.md](creator-editor-automation.md))
+   → "Detect errors" → Run. Rename: `PATCH /connector/<id>/ {name}` (200 "Ok").
 
 ## Tables, variables, items
 
@@ -39,6 +44,14 @@ page, it self-refreshes). js() runs work on hidden tabs; CDP *input* does not.
   reload (drawer caches the list at load).
 - `GET /data_group/<id>/item/?page=1&ordering=id` (page_size up to 100), `.../item/get_count/`,
   `DELETE /data_group/<id>/item/<itemId>/` → 204 (batch_delete broken — loop per-item).
+- **No REST create-row.** `POST` / `PUT` / `PATCH` on `/data_group/<id>/item/`,
+  `/item/create/`, `/items/`, `/row/`, `/item/add/` are 405 or 404. Rows appear
+  only when a **run** writes them (`zw.setRef`, Save Web Element, Update Data).
+- Item JSON is **not** a flat `data` dict. Shape:
+  `{results:[{id, cells:[{column_id, text, is_preview}], files:[]}]}`.
+  Map `column_id` through `GET /data_group/<id>/column/` (`colName` on create,
+  `name` on later POSTs). Reading `row["author"]` will look empty even when
+  `cells` hold the value.
 
 ## Runs & observability
 

@@ -73,6 +73,88 @@ Send HTTP (GET api) → math (op on value) → Ask ChatGPT (prompt referencing t
 answer → var) → Log (interpolates both). No browser launch: run completes in ~1s; with
 ChatGPT ~5s. Duration is the signature that blocks actually executed.
 
+## Pattern 6 — LinkedIn home-feed scrape (SPA, infinite scroll)
+
+LinkedIn's feed is a virtualized SPA. CSS `{loop_index}` / `:nth-of-type` is the
+wrong tool (cards remount under different parents). Use Pattern 3 (Write JS +
+`appendIndex`) inside Try-Catch.
+
+```
+delete_table_data (all rows, optional overwrite)
+→ launch_browser (bypass bot detection ON — LinkedIn fingerprints)
+→ open_link https://www.linkedin.com/feed/
+→ sleep 4–6s
+→ try
+     → write_js  (browser execution, NOT Run locally)
+     → catch → log
+     → after_try → remove_duplicate_rows (column post_urn) → log
+```
+
+**Table columns:** `post_urn`, `author`, `author_headline`, `author_url`,
+`post_text`, `posted_at`, `post_url`, `reactions`, `comments`, `reposts`,
+`has_media`, `post_type`.
+
+**Write JS (browser, not Run locally):** throw on login, then scroll +
+"See more", then collect cards. Skeleton (no account ids):
+
+```js
+if (/\/login|\/uas\/login|\/checkpoint/i.test(location.href) ||
+    document.querySelector('input#username, input[name="session_key"]')) {
+  await zw.log({ message: "LinkedIn login required", status: "fail", tag: "linkedin" });
+  throw new Error("LinkedIn session missing");
+}
+function clickSeeMore() {
+  document.querySelectorAll("button").forEach(function (b) {
+    var t = (b.innerText || "").toLowerCase();
+    if (t.indexOf("see more") !== -1) { try { b.click(); } catch (e) {} }
+  });
+}
+for (var r = 0; r < 8; r++) {
+  window.scrollBy(0, Math.max(window.innerHeight, 900));
+  await zw.delay({ min: 1200, max: 2000 });
+  clickSeeMore();
+}
+var cards = document.querySelectorAll(
+  'div.feed-shared-update-v2, div[data-urn*="urn:li:activity"], div.occludable-update'
+);
+// per card: data-urn / actor title / .update-components-text / reaction aria-labels
+// await zw.setRef({ ref_id: <tableId>, name, value: String(...), appendIndex: i })
+```
+
+**Login:** Agent Chrome (not Creator Chrome) must already be signed in —
+sticky profile or Launch Browser cookies. A feed tab in the creator
+window does not count. Cold incognito → login throw → catch → success /
+0 errors → **0 table rows**. That is expected, not a selector bug.
+Cookie-DB copy from the user's Chrome is not an unattended path
+([run-and-platform.md](run-and-platform.md) "Two Chromes").
+
+**Remove Duplicates on an empty key:** if every row's `post_urn` is `""`,
+dedupe treats them as the same row and keeps **one**. Live: 8
+`appendIndex` writes → `"7 duplicate rows were removed. 1 unique row
+remains."` Always write a unique `post_urn` (the card's `data-urn`, or
+a fallback `author + first 80 chars of body`). Do not dedupe on a
+column you left blank.
+
+**Verify after a "successful" run:** `item/get_count/` plus Live Runs
+text (`Opened the URL`, `Pausing run for N seconds`, the throw message,
+dedupe unique-count). `GET /get_workflow()` will not show drawer
+values. Item cells are `{column_id, text}` ([rest-api.md](rest-api.md)).
+
+**Live proof (structure + drawers + Run, not a logged-in scrape):**
+cua-driver on the paired creator Chrome filled Open Link / Delay /
+Delete / Dedupe and clicked Run. Pipeline: Delete all rows → Launch
+Browser → Open the feed URL → Delay ~4–6s → Write JS (browser) threw
+`LinkedIn session missing` → catch → Remove Duplicates (0 rows) →
+"Your TaskBot ran successfully." A later local Write JS (`// @zw-run-locally`
++ `fs.readFileSync` of a device-side JSON, unique `post_urn`s) wrote
+rows via `setRef` — proof that table writes work; that file is **not**
+part of the skill and must never be committed. Put the live in-page
+scrape back once Agent Chrome has a session.
+
+**Why not Save Web Element × N:** feed cards are not a stable incremental list.
+XPath `({loop_index})` works for static grids (Pattern 1), not LinkedIn's
+occluded virtualizer.
+
 ## Working reference bots
 
 Keep a set of demo bots in a scratch/test account as living documentation:

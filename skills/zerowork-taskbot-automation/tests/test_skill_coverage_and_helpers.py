@@ -59,5 +59,33 @@ class TestHelpersFromConsumer(unittest.TestCase):
         self.assertIn("Auto-align top to bottom", sel["top_to_bottom"])
 
 
+class TestCuaHelpers(unittest.TestCase):
+    def test_find_card_group_picks_large_parent_not_the_text(self):
+        cua = _load("zw_cua_consumer", SCRIPTS / "zw_cua.py")
+        elements = [
+            {
+                "element_index": 10,
+                "role": "Group",
+                "label": None,
+                "frame": {"w": 114, "h": 115, "x": 0, "y": 0},
+            },
+            {
+                "element_index": 11,
+                "role": "Group",
+                "label": None,
+                "frame": {"w": 26, "h": 88, "x": 0, "y": 0},
+            },
+            {
+                "element_index": 12,
+                "role": "Text",
+                "label": "Open Link",
+                "frame": {"w": 88, "h": 26, "x": 0, "y": 0},
+            },
+        ]
+        hit = cua.zw_cua_find_card_group(elements, "Open Link")
+        self.assertIsNotNone(hit)
+        self.assertEqual(hit["element_index"], 10)
+
+
 if __name__ == "__main__":
     unittest.main()

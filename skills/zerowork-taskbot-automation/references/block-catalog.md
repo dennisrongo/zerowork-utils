@@ -137,6 +137,10 @@ Start Repeat, Check Web Element, Start Try-Catch. Everyone else: one out.
   scripts / page-visibility still apply. Bypass ignores window size, launch
   args, browser engine; blocks uploads ≳ 50 MB. Background + stay-on-page
   leaves an invisible browser. Closing the last tab ends the context.
+  The live drawer is a long stack of tri-state radios (`Use current
+  defaults` / `On` / `Off`); Stay-on-page is near the **bottom**. Click
+  **On**, wait for Unsaved changes, then SAVE — a miss can close the
+  drawer with no write.
 
 ## Quit Browser (`quit_browser`)
 
@@ -604,6 +608,9 @@ Start Repeat, Check Web Element, Start Try-Catch. Everyone else: one out.
 - **When to use vs adjacent:** After Save Lists. Prevent-rerun while
   iterating = Update Data status + condition, not this.
 - **Gotchas:** Always specify a column unless you have a reason not to.
+  If every row's comparison value is empty, **all rows are duplicates of
+  each other** and one remains. Populate the key column (e.g. `post_urn`)
+  before this block.
 
 ## Delete Table Data (`delete_table_data`)
 

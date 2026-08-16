@@ -23,6 +23,9 @@ docs.zerowork.io/.../building-block-options/auto-align.md
 
 Edges: prefer REST POST /connector/<id>/edge/ over CDP. The creator is not
 "no API" — node/edge/table/rename are REST; drawer SAVE is websocket-only.
+
+Paired-Chrome / no page-JS: use zw_cua.py (cua-driver UIA). Do not use this
+file's zw_run() from Playwright — that Chrome is unpaired ("Agent offline").
 """
 
 def zw_edge_payload(source_id, target_id, source_handle="a", target_handle="a"):
