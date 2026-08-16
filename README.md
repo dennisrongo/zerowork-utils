@@ -38,7 +38,19 @@ skills/zerowork-taskbot-automation/
 
 ### Installing
 
-Copy the `skills/zerowork-taskbot-automation/` folder into your agent's skill library:
+Install with the [skills CLI](https://github.com/vercel-labs/skills) (recommended — works with Claude Code, Hermes, Codex, Cursor, Copilot, and 15+ other agents):
+
+```bash
+npx skills add dennisrongo/zerowork-utils
+```
+
+The CLI lists skills found in the repo and installs into the agents it detects. To install non-interactively:
+
+```bash
+npx skills add dennisrongo/zerowork-utils --skill zerowork-taskbot-automation -y
+```
+
+Or copy the `skills/zerowork-taskbot-automation/` folder manually into your agent's skill library:
 
 - **Hermes Agent** — your profile's `skills/` directory (e.g. `%LOCALAPPDATA%\hermes\profiles\<profile>\skills\automation\`)
 - **Claude Code / other agents** — the project or user skills directory your agent scans (e.g. `.claude/skills/`)
