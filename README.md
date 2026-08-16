@@ -2,6 +2,10 @@
 
 This guide provides step-by-step instructions on how to execute the ZeroWork installation script on your Ubuntu VPS. This automated script will set up a complete desktop environment with Google Chrome and ZeroWork.
 
+## ZeroWork Skills
+
+`skills/zerowork-taskbot-automation/` — a production-tested agent skill for building, configuring, and running ZeroWork TaskBots programmatically: the undocumented REST API, all 44 canonical node types, canvas/drawer automation via CDP, validator wiring rules, and verified build patterns (pagination, try-catch, conditions, HTTP + ChatGPT pipelines). Drop it into any Hermes-style agent's skill library or read it as reference documentation.
+
 ## Video Demonstration
 
 For a visual walkthrough of this installation process, check out this [YouTube demonstration video](https://youtu.be/_uhx_y_ZvGM) which shows the entire process in action.
