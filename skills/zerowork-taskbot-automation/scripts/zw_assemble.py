@@ -4,7 +4,8 @@
 Replacement for session scratch `zw_build_*.py` / `zw_rebuild_*.py`.
 The spec has no account ids. Custom `data.name` is overwritten by the
 default type label — rename on the canvas after assemble
-(`zw_rename.py`). Drawer fields are still websocket-only.
+(`zw_rename.py`). Drawer fields are still websocket-only. Spec keys `fill`, `text`, and
+`source` are post-assemble hints — this script does not POST them.
 
     python zw_assemble.py templates/x_feed_nocode.json
     python zw_assemble.py templates/linkedin_feed.json --name "Demo - LinkedIn Feed"

@@ -88,14 +88,21 @@ Assemble a spec: [../scripts/zw_assemble.py](../scripts/zw_assemble.py).
    `Open → loop(pages) → loop(count elements) → [out1] saves×N / [out2] After Repeat → Click Next → Log`.
 3. **Same rule for Try-Catch**: On Catch Error AND After Try-Catch each wire directly off the
    Start Try-Catch node. `try → click-body … try → catch`, `try → after_try → rest`.
+   Start Try-Catch may have **at most THREE connections**: one body + On Catch +
+   After Try-Catch. A fourth wire (Write JS sibling off Try) fails Detect errors:
+   "The Start Try-Catch building block can have up to three connections...".
+   Valid JS demo topology: Wait for timeline → Harvest while scroll → Scrape
+   scope (try) → (Scroll rounds | catch | after_try). Do not also wire harvest
+   off try.
 4. Empty required fields are named by node ID ("Some required fields are empty... <nodeId>").
 5. Rules apply to deactivated nodes too.
 
 ## Verified semantics (controlled experiments, Aug 16 2026)
 
-- **Try-Catch works**: bot with `open → try → click(.nonexistent) → catch-path → after → log`
-  ran Success/0 errors; identical control bot without try ran error/1 error. Catch swallows the
-  step failure; execution continues at After Try-Catch.
+- **Try-Catch works**: bot with `open → try → click(definitely-not-present-element)`
+  + catch (dead-end, no outgoing edge) + after_try → Log
+  `TRY-CATCH TEST: run continued after error` ran Success/0 errors; identical control bot without try ran error/1 error. Catch swallows the
+  step failure; execution continues at After Try-Catch. Do not wire catch → log.
 - **Pagination**: the nested-loop pattern above scraped 54/60 rows across 3 pages in 11s
   (inner loop raced page-3 render for ~6 books — add Delay after Click Next or wait-selectors).
 - **Condition system**: Start Condition (`check_dynamic_data`) holds the value to compare; each

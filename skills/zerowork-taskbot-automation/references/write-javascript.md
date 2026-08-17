@@ -12,6 +12,11 @@ UIA `set_value` on Monaco is a no-op — use the type_text recipe in
 you must type into the drawer yourself. If a human is sitting in the
 Write JS block, give them **one pasteable script** (see Authoring
 below) — do not spend a cycle SendInput-ing thousands of characters.
+In-page harvest (X/LinkedIn feed): leave **Run locally** unchecked
+and `setValue` from the matching `templates/*_harvest.js`. Empty
+unconnected Write JS nodes fail Detect errors — delete orphans;
+keep one connected Write JS named **Harvest while scroll** on the
+X canvas.
 
 ## Local vs browser execution
 

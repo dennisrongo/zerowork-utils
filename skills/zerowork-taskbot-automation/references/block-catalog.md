@@ -38,12 +38,24 @@ adjacent**, **Gotchas**.
 
 `loop` + `continue_after_repeat`, `try` + `after_try` + `catch` — the
 opener carries the config; companions are flow structure with no (or
-almost no) drawers of their own. Drop/create the opener; wire companions
+almost no) drawers of their own. Catch / After-Try / Break / After-Repeat / Found / Not Found /
+Abort Run: select+click often opens **no drawer**. That is expected,
+not a failed open. Drop/create the opener; wire companions
 **directly off it** (never after the last body block). Validator wording:
 [rest-api.md](rest-api.md).
 
 Branch-capable (may have more than one outgoing edge): Start Condition,
 Start Repeat, Check Web Element, Start Try-Catch. Everyone else: one out.
+Start Try-Catch is still capped at **THREE** connections (one body +
+On Catch + After Try-Catch). A fourth wire fails Detect errors:
+"The Start Try-Catch building block can have up to three connections...".
+
+## Common browser-node drawer pattern
+
+Selector-driven web blocks share: CSS/XPath selector + **Selector
+options** collapsible + min/max sec + **V / T** insert helpers.
+**Check Web Element** also has **Selector must be visible on screen**.
+**Hover** does not.
 
 ---
 
@@ -73,7 +85,8 @@ Start Repeat, Check Web Element, Start Try-Catch. Everyone else: one out.
 
 - **Official:** https://docs.zerowork.io/using-zerowork/using-building-blocks/save-page-url.md
 - **Purpose:** Write the **current tab's URL** to a variable or table column.
-- **Config / drawer fields:** save-target picker (table → column / variable).
+- **Config / drawer fields:** **Save current page URL to** table/variable
+  picker. No min/max.
 - **Wiring / companions:** Single-out. Place after Open Link / Click that
   landed on the page you want recorded.
 - **When to use vs adjacent:** Current location. Save Web Element → Save-as
@@ -85,10 +98,11 @@ Start Repeat, Check Web Element, Start Try-Catch. Everyone else: one out.
 - **Official:** https://docs.zerowork.io/using-zerowork/using-building-blocks/switch-or-close-tab.md
 - **Purpose:** Activate or close a tab by latest / previous / next /
   URL-match / tab number.
-- **Config / drawer fields:** Action radios **Switch** vs **Close**. Target:
-  Latest, Previous, Next, Tab URL matching (full, partial, or
-  `/regex/flags` — invalid regex is treated as a literal, no error), Tab
-  number (1 = leftmost). Min/max delay.
+- **Config / drawer fields:** Action **Switch** / **Close**. Target:
+  **Latest** / **Previous** / **Next** / **Tab URL matching** (full /
+  partial / regex — `/regex/flags`; invalid regex is treated as a
+  literal, no error) / **Tab number** (default **1**, leftmost).
+  Min/max.
 - **Wiring / companions:** Single-out. After Open-in-new-tab, or to close
   leftovers. Closing the last tab **ends the browser context**; next
   browser action needs Open Link / Launch Browser or the run errors.
@@ -103,11 +117,14 @@ Start Repeat, Check Web Element, Start Try-Catch. Everyone else: one out.
 
 - **Official:** https://docs.zerowork.io/using-zerowork/using-building-blocks/go-back-or-forward.md
 - **Purpose:** Browser history back or forward.
-- **Config / drawer fields:** radios back / forward; min/max.
+- **Config / drawer fields:** radios **Go back** / **Go forward**. Live
+  playground had **neither** selected (dead default footgun — Detect
+  errors may stay quiet; set one before a client build). Min/max.
 - **Wiring / companions:** Single-out.
 - **When to use vs adjacent:** History. Prefer Open Link to a known URL
   when you can — more deterministic than history.
-- **Gotchas:** No history entry = no-op, run continues.
+- **Gotchas:** No history entry = no-op, run continues. Unset radios
+  (neither selected) is a dead default — the block will not navigate.
 
 ## Launch Browser (`launch_browser`)
 
@@ -148,7 +165,8 @@ Start Repeat, Check Web Element, Start Try-Catch. Everyone else: one out.
   (not listed on the building-blocks hub).
 - **Purpose:** Close the browser this TaskBot is using. Often unnecessary —
   the agent closes Chrome at run end unless Stay-on-page is on.
-- **Config / drawer fields:** **Force quit** checkbox.
+- **Config / drawer fields:** **Force quit** checkbox (unchecked live).
+  No min/max.
 - **Wiring / companions:** Single-out. Place before a later Open Link /
   Launch Browser if you need a **fresh** context mid-run.
 - **When to use vs adjacent:** Explicit teardown, or to override
@@ -163,23 +181,31 @@ Start Repeat, Check Web Element, Start Try-Catch. Everyone else: one out.
 - **Official:** https://docs.zerowork.io/using-zerowork/using-building-blocks/switch-frame.md
 - **Purpose:** Enter an iframe (or return to the main frame) so later
   selector blocks see that document.
-- **Config / drawer fields:** radios enter iframe (selector of the
-  `<iframe>`) vs **Main frame**; min/max.
+- **Config / drawer fields:** radios **Iframe** / **Main page**. Live
+  playground had **neither** selected (dead default, same class as
+  Go Back — Detect errors may stay quiet; set one before a client
+  build). min/max **0/0**. Choosing Iframe reveals the iframe
+  selector.
 - **Wiring / companions:** Single-out. All following web blocks stay in
   that frame until Main frame / Open Link / Switch-or-Close Tab (those
   **clear** the frame). Nested iframes = chained Switch Frame blocks.
 - **When to use vs adjacent:** Iframes only. A "selector not found" inside
   an embedded form/checkout/recaptcha is usually a missing Switch Frame.
-- **Gotchas:** Missing iframe → error, stop. Increase selector timeout on
-  in-frame Click/Save/Hover. Nested: you must walk each level.
+- **Gotchas:** Unset radios (neither Iframe nor Main page selected) is
+  a dead default — same class as Go Back. Missing iframe → error,
+  stop. Increase selector timeout on in-frame Click/Save/Hover.
+  Nested: you must walk each level.
 
 ## Browser Alert (`accept_dialog`)
 
 - **Official:** https://docs.zerowork.io/using-zerowork/using-building-blocks/browser-alert.md
 - **Purpose:** Accept a native dialog (`alert` / `confirm` / `prompt` /
   `beforeunload`). Default platform behavior is **Cancel**.
-- **Config / drawer fields:** textarea **response text** (prompt only;
-  ignored for alert/confirm/beforeunload); min/max.
+- **Config / drawer fields:** optional **Prompt response** textarea
+  (prompt only; ignored for alert/confirm/beforeunload). Live
+  playground min/max **0/0**. No explicit Accept vs Dismiss control
+  in the drawer. Palette card is **Browser Alert** — there is no
+  Accept/Dismiss Dialog block (search "dialog" returns this).
 - **Wiring / companions:** Single-out. Place **after** the action that
   triggers the dialog.
 - **When to use vs adjacent:** Native browser dialogs, not in-page modals
@@ -207,6 +233,10 @@ Start Repeat, Check Web Element, Start Try-Catch. Everyone else: one out.
 - **Gotchas:** Prove uniqueness with `querySelectorAll`. Custom-styled
   "dropdowns" (`div`/`button`) are Clicks, not Select. First-letters-cut
   on a following Insert Text → Click the field first.
+  Skip-if-not-found **off** + a missing selector is a catchable
+  error (Pattern 4 uses `definitely-not-present-element` on
+  purpose). Skip-if-not-found **on** swallows the miss without
+  entering catch. Live Pattern 4: left click, human-like **off**.
 
 ## Check Web Element (`check`) — branches `element_present` / `element_absent`
 
@@ -214,17 +244,24 @@ Start Repeat, Check Web Element, Start Try-Catch. Everyone else: one out.
 - **Purpose:** Branch on whether a selector is in the DOM. **Found** =
   `element_present`, **Not Found** = `element_absent`. Those two are
   canvas branch markers, not standalone configurable blocks.
-- **Config / drawer fields:** textarea CSS/XPath; timeout; two outputs.
+- **Config / drawer fields:** selector CSS/XPath; **Selector options**
+  collapsible; **Selector must be visible on screen** checkbox; min/max
+  sec. **V / T** insert helpers. Found and Not Found are **no-drawer**
+  outcome marker cards (`element_present` / `element_absent`) — do not
+  open a drawer on them. Branching is **edge wiring off Check**, not a
+  drawer field.
 - **Wiring / companions:** **Two outgoing edges** (Found / Not Found).
   Typical: Found → continue happy path; Not Found → Send Notification /
-  Break Repeat / skip.
+  Break Repeat / skip. Wire those edges off `check`; Found / Not Found
+  cards have no config.
 - **When to use vs adjacent:** Presence of a **web element**. For "is this
   variable empty?" use Start/Set Condition **Data found / not found**. For
   "did the HTTP call return 200?" save status + Set Condition.
 - **Gotchas:** Check timeout ≠ later block timeout. Official common
   problem: Check says Found, next Click/Save misses — race / overlay.
   Re-Check or Delay immediately before the action. Increase timeout in
-  iframes.
+  iframes. Select+click on Found / Not Found opens **no drawer** —
+  that is expected.
 
 ## Save Web Element (`save`)
 
@@ -283,11 +320,12 @@ Start Repeat, Check Web Element, Start Try-Catch. Everyone else: one out.
 
 - **Official:** https://docs.zerowork.io/using-zerowork/using-building-blocks/insert-text-or-data.md
 - **Purpose:** Type or paste into an input (forms, search, DMs, login).
-- **Config / drawer fields:** content textarea + `{id,name}` / `${}` /
-  **spintax** checkbox; **Insert instantly without typing delay** (paste);
-  typing-speed radios when not instant (VERY SLOW → PRO); **no-Enter**;
-  optional selector; **Encrypt content** (password — irreversible; delete
-  and re-enter to change).
+- **Config / drawer fields:** **Content** textarea (`{id,name}` / `${}` /
+  spintax); **Use spintax** CHECKED by default; **Don't press Enter on
+  line breaks**; optional selector; typing-speed slider **PRO / FAST /
+  AVERAGE / SLOW / VERY SLOW** (~65-90 wpm at FAST); **Insert instantly**
+  checkbox (paste; selector required when on); min/max; **Encrypt
+  content** (password — irreversible; delete and re-enter to change).
 - **Wiring / companions:** Single-out. Click the field first if the site
   swallows leading keystrokes. Pair with Keyboard Enter to submit if
   no-Enter is on.
@@ -304,7 +342,9 @@ Start Repeat, Check Web Element, Start Try-Catch. Everyone else: one out.
 - **Official:** https://docs.zerowork.io/using-zerowork/using-building-blocks/hover-web-element.md
 - **Purpose:** Hover so a tooltip / date / menu appears, then Save or Click
   it.
-- **Config / drawer fields:** textarea CSS/XPath; min/max.
+- **Config / drawer fields:** selector CSS/XPath; **Selector options**
+  collapsible; min/max. **No** "Selector must be visible on screen"
+  checkbox (that is Check-only). **V / T** insert helpers.
 - **Wiring / companions:** Single-out. Hover → Save/Click the revealed node.
 - **When to use vs adjacent:** Reveal-on-hover only. Not a substitute for
   Click.
@@ -314,8 +354,9 @@ Start Repeat, Check Web Element, Start Try-Catch. Everyone else: one out.
 
 - **Official:** https://docs.zerowork.io/using-zerowork/using-building-blocks/select-web-dropdown.md
 - **Purpose:** Choose an `<option>` in a native `<select>`.
-- **Config / drawer fields:** input option text/value; textarea dropdown
-  selector (must be a `select` tag); min/max.
+- **Config / drawer fields:** **Dropdown option** (text/value); selector
+  of the dropdown (must be a `select` tag); **Selector options**
+  collapsible; min/max. **V / T** insert helpers.
 - **Wiring / companions:** Single-out.
 - **When to use vs adjacent:** Real `<select>` only. Custom `div`/`button`
   "dropdowns" → Click (open) + Click (option), or Keyboard.
@@ -336,7 +377,9 @@ Start Repeat, Check Web Element, Start Try-Catch. Everyone else: one out.
   Cmd+S save-as, maximize) **does not work**.
 - **Gotchas:** Shift+Tab order is Shift **then** Tab. Common-problem page:
   nothing happens = no focus, or the site eats keys. Not a substitute for
-  Click on custom widgets.
+  Click on custom widgets. Empty key field can pass Detect errors but
+  the scrape still fails — Page down to load more must be **PageDown**
+  (or End).
 
 ---
 
@@ -415,6 +458,9 @@ Start Repeat, Check Web Element, Start Try-Catch. Everyone else: one out.
     (Keyboard fallback).
   - Auto-continue: Dynamic = next **row**; Standard = next **list
     selector**. `Start from` is a floor.
+  - Loop type can be **UNSET** (neither Standard nor Dynamic
+    selected). Detect errors may stay quiet. Set **Standard**
+    before a client build (live Pattern 4 footgun).
 
 ## After Repeat (`continue_after_repeat`)
 
@@ -429,20 +475,23 @@ Start Repeat, Check Web Element, Start Try-Catch. Everyone else: one out.
 - **When to use vs adjacent:** Post-loop work. Deactivating Start Repeat
   skips the body and continues at After Repeat.
 - **Gotchas:** Never chain it after the last Save in the body.
+  Select+click often opens **no drawer** (no configurable fields).
 
 ## Break Repeat (`loop_exit`)
 
 - **Official:** https://docs.zerowork.io/using-zerowork/using-building-blocks/break-repeat.md
 - **Purpose:** Leave the **current** loop early (no more results, HTTP
   status ≠ 200, DM counter hit the cap).
-- **Config / drawer fields:** None significant.
+- **Config / drawer fields:** None — select+click often opens **no drawer**.
 - **Wiring / companions:** Single-out. Typically under a Set Condition or
   Check Not-Found **inside** the loop. Execution continues at After Repeat
   (if any).
 - **When to use vs adjacent:** Exit this loop, keep the bot running.
   Abort Run kills the **whole** run. Raise Error / throw fails the run
   (catchable).
-- **Gotchas:** Breaks the innermost loop only.
+- **Gotchas:** Breaks the innermost loop only. Wire off a Set
+  Condition (or Check Not-Found), **not** after the last body
+  block. Select+click often opens **no drawer**.
 
 ## Run TaskBot (`run_taskbot`)
 
@@ -450,10 +499,12 @@ Start Repeat, Check Web Element, Start Try-Catch. Everyone else: one out.
   (agent **≥ 1.1.75**; not on the building-blocks hub).
 - **Purpose:** Start another TaskBot from this one (sub-bot). Optionally
   wait; optionally pass variable values.
-- **Config / drawer fields:** TaskBot picker, or **Custom** id (literal /
-  ref / `${}`). Variable name/value pairs (only listed vars change).
-  **Wait until the TaskBot finishes**. Persist-value is a setting **on
-  the child variable**, not here (off = this-run-only).
+- **Config / drawer fields:** **Select a TaskBot** dropdown (your bots),
+  or **Custom** id (literal / ref / `${}`). Variable name/value pairs
+  (only listed vars change). **Wait until the TaskBot finishes**
+  checkbox — **CHECKED = sync**; uncheck = fire-and-forget. **No min/max
+  delay.** Persist-value is a setting **on the child variable**, not
+  here (off = this-run-only).
 - **Wiring / companions:** Single-out. Wrap with Try-Catch if Wait is on
   (child fail / manual stop throws here). Concurrent Runs on the child
   lets several parents call it in parallel.
@@ -471,10 +522,18 @@ Start Repeat, Check Web Element, Start Try-Catch. Everyone else: one out.
   the protected scope. On error, jump to `catch`. After success **or**
   catch, continue at `after_try`.
 - **Config / drawer fields:** Opener may be empty; companions are structure.
+  Catch and After Try-Catch have **no drawer** — select+click often
+  opens nothing. That is expected.
 - **Wiring / companions:** `catch` AND `after_try` **both wire directly
   off `try`**. Never `try → body → catch` or `catch → after_try`.
+  At most THREE connections total: one body + On Catch + After
+  Try-Catch. A Write JS sibling off Try (fourth wire) fails Detect
+  errors: "The Start Try-Catch building block can have up to three
+  connections...". Valid JS demo: Wait for timeline → Harvest while
+  scroll → Scrape scope (try) → (Scroll rounds | catch | after_try).
   Verified: failing click with try-catch → Success/0 errors; without →
-  run error.
+  run error. Catch is a **dead-end on purpose** (no outgoing edge).
+  Do not wire `catch → log`. The continue path is `try → after_try → Log`.
 - **When to use vs adjacent:** Recoverable step failures. Abort Run for
   unrecoverable. Raise Error / `throw` to **enter** a catch on purpose.
 - **Gotchas:** Start-failure (outdated agent, invalid setup, more than
@@ -487,23 +546,29 @@ Start Repeat, Check Web Element, Start Try-Catch. Everyone else: one out.
   (page is a stub — "upcoming").
 - **Purpose:** Fail the current step with an error so Try-Catch can
   branch, or so the run is marked failed and notifications fire.
-- **Config / drawer fields:** Error message (live drawer; official page
-  empty). Write JS `throw new Error("…")` is the documented equivalent.
+- **Config / drawer fields:** optional message (live default **"A custom error was raised."**);
+  checkboxes **Mark this TaskBot run as failed in the run report** and
+  **Include this error in the error report** (both **unchecked** live). Write JS `throw new Error("...")` is the
+  documented equivalent.
 - **Wiring / companions:** Single-out. Place inside a try body to force
   the catch path.
 - **When to use vs adjacent:** Intentional failure. Abort Run stops
   **without** treating it as a catchable step error in the same way —
   use Abort when you just want out. Log + Abort if you only need a
   breadcrumb.
-- **Gotchas:** Official page has no field list; prefer Write JS `throw`
-  when you need a precise message in reports.
+- **Gotchas:** Official page is a stub. Live defaults leave both report
+  checkboxes off — turn them on if you want the run / error report to
+  record the raise. Prefer Write JS `throw` when you need a precise
+  custom message beyond the default.
 
 ## Abort Run (`abort`)
 
 - **Official:** https://docs.zerowork.io/using-zerowork/using-building-blocks/abort-run.md
 - **Purpose:** Stop the **entire** run immediately (critical data missing,
   hard cap reached and you do not want After Repeat).
-- **Config / drawer fields:** None significant.
+- **Config / drawer fields:** **No drawer** — no configurable fields.
+  Select+click opens nothing. That is expected. Palette card is
+  **Abort Run** (LOGIC), not "Abort / Stop TaskBot".
 - **Wiring / companions:** Terminal. Typically under a Set Condition.
 - **When to use vs adjacent:** Kill the run. Break Repeat only leaves the
   loop. Raise Error marks failure (and is catchable).
@@ -545,6 +610,8 @@ Start Repeat, Check Web Element, Start Try-Catch. Everyone else: one out.
   extract-then-math.
 - **Gotchas:** Empty operand → skip, continue. Non-numeric input to any
   op except Add → error, stop. Remove format is the sanitizer for prices.
+  Live Pattern 5: **Multiply** `fx_x100` × **2.5**, write back to
+  `fx_x100`. Pick `{id, name: fx_x100}` via **V / My references**.
 
 ## Format Data (`format_data`)
 
@@ -570,8 +637,10 @@ Start Repeat, Check Web Element, Start Try-Catch. Everyone else: one out.
 
 - **Official:** https://docs.zerowork.io/using-zerowork/using-building-blocks/split-data.md
 - **Purpose:** Break a value on a separator into columns/variables.
-- **Config / drawer fields:** value; separator; positions → destinations.
-  Positions 1-based from the start; **negative** from the end (agent
+- **Config / drawer fields:** Live playground empty default shows only
+  **Text to split** table/variable picker. After a source is chosen,
+  official fields: separator; positions → destinations. Positions
+  1-based from the start; **negative** from the end (agent
   ≥ 1.1.61). Position `0` errors.
 - **Wiring / companions:** Single-out. Missing position → that dest stays
   empty, no error.
@@ -617,7 +686,9 @@ Start Repeat, Check Web Element, Start Try-Catch. Everyone else: one out.
 - **Official:** https://docs.zerowork.io/using-zerowork/using-building-blocks/delete-data.md
 - **Purpose:** Delete **all rows** (overwrite-before-scrape) or **one
   row** (current Dynamic-loop row, e.g. disqualified lead).
-- **Config / drawer fields:** table picker; scope all vs one.
+- **Config / drawer fields:** Live playground empty default shows only
+  **Delete from** table/variable picker. Official scope: all rows vs
+  one (current Dynamic-loop) row.
 - **Wiring / companions:** All-rows: **before** the Standard loop. One-row:
   inside Dynamic loop under a Set Condition.
 - **When to use vs adjacent:** Wipe or prune. Clear a variable = Update
@@ -644,15 +715,20 @@ Start Repeat, Check Web Element, Start Try-Catch. Everyone else: one out.
   API (including non-OpenAI LLMs).
 - **Gotchas:** Missing key / bad model / empty prompt hard-stop. Token
   budget is shared prompt+completion. Verified browserless run ~5s.
+  Live Pattern 5: model **ChatGPT 5.5** (`gpt-5.5`); prompt
+  `Classify this number as HIGH or LOW in one word, nothing else: {fx_x100}`;
+  answer → variable `gpt_answer`. Pick the dest with **V / My
+  references**.
 
 ## Send Notification (`email`)
 
 - **Official:** https://docs.zerowork.io/using-zerowork/using-building-blocks/send-notification.md
 - **Purpose:** Email **the account owner** (not arbitrary recipients).
-- **Config / drawer fields:** live drawer also has input[email] (account
-  dest / override — official page says destination is the account email);
-  subject; body (plaintext and/or minified HTML). From
-  `no-reply@notifications.zerowork.io`.
+- **Config / drawer fields:** **Subject**; **Email content**
+  (plaintext and/or minified HTML); min/max. **No To: field.** Sends
+  to the signed-in account email (drawer copy says the email will be
+  sent there). Not an arbitrary recipient. Palette card is **Send
+  Notification** (EXTERNAL), not "Email" / "Send Email".
 - **Wiring / companions:** Single-out. After Check Not-Found, After Repeat,
   or a failure branch.
 - **When to use vs adjacent:** Self-alert. Other recipients → Send HTTP to
@@ -678,6 +754,9 @@ Start Repeat, Check Web Element, Start Try-Catch. Everyone else: one out.
   **no matching columns = no save, no error**. Trailing-slash sensitivity.
   Auto-retry on 429 / network timeout (1.1.61). Verified GET → downstream
   math works.
+  Empty **SAVE RESPONSE** (body, nested path, and status code **all empty**) = the HTTP call is a **no-op**. Detect errors can stay quiet while the API result is discarded (live Pattern 5 **footgun**,
+  GET `https://api.frankfurter.app/latest?from=USD&to=GBP`, no headers,
+  no body). Fill SAVE RESPONSE or the GET is discarded.
 
 ## Write JavaScript (`write_js`)
 
@@ -734,8 +813,10 @@ See [write-javascript.md](write-javascript.md) for the full `zw` API.
 
 - **Official:** https://docs.zerowork.io/using-zerowork/using-building-blocks/upload-file.md
 - **Purpose:** Feed a file chooser from a URL or a local full path.
-- **Config / drawer fields:** From file URL (or file-column ref) vs from
-  folder path (docs say folder; examples are the **file pathname**).
+- **Config / drawer fields:** tip "Make sure to initiate the upload by clicking the 'Upload' button in the previous step."
+  File source radios **From file URL** / **From folder path on your computer** —
+  live playground had **neither** selected. min/max.
+  Official examples treat the folder-path option as a **file pathname**.
 - **Wiring / companions:** **Click the upload control first**. Chooser is
   invisible during the run.
 - **When to use vs adjacent:** Page uploads. Not for stuffing a file
@@ -766,8 +847,10 @@ See [write-javascript.md](write-javascript.md) for the full `zw` API.
 - **Official:** https://docs.zerowork.io/using-zerowork/using-building-blocks/record-date.md
 - **Purpose:** Write a formatted now/offset date into a var/column for
   later Before/After conditions.
-- **Config / drawer fields:** format + save-to (official page is thin;
-  live drawer has format + dest).
+- **Config / drawer fields:** **Select date format** dropdown (nothing
+  selected live). No min/max. Official page is thin; dest/save-to
+  may appear after a format is chosen. Palette card is **Record
+  Date** (TOOLS), not "Insert Date".
 - **Wiring / companions:** Single-out. Pair with Set Condition Before/After
   (same format both sides; days shift lives on the condition).
 - **When to use vs adjacent:** Structured dates. Write JS `Date`/`dayjs`
@@ -781,9 +864,11 @@ See [write-javascript.md](write-javascript.md) for the full `zw` API.
   (stub; fields from live drawer + release notes).
 - **Purpose:** Capture visible / full page / element as png or jpeg to a
   local folder; optionally save the path.
-- **Config / drawer fields:** visible / full-page / element radios;
-  png/jpeg; local folder; same file options as Save File. Max wait
-  default 2 minutes.
+- **Config / drawer fields:** **Visible page** / **Full page** / **Web
+  element**; **.png** / **.jpeg**; folder path placeholder
+  `/Users/<your-username>/Downloads`; **File options** collapsible
+  (same unique-on-conflict / custom name / save-path as Save File);
+  min/max. Max wait default 2 minutes.
 - **Wiring / companions:** Single-out. Upload File via saved path.
 - **When to use vs adjacent:** Pixels. Save Web Element for text/HTML.
 - **Gotchas:** Path → standard column, not file column.
@@ -792,7 +877,9 @@ See [write-javascript.md](write-javascript.md) for the full `zw` API.
 
 - **Official:** https://docs.zerowork.io/using-zerowork/using-building-blocks/save-from-clipboard.md
 - **Purpose:** Read the OS clipboard into a var/column.
-- **Config / drawer fields:** save-to.
+- **Config / drawer fields:** **Save copied text to** table/variable
+  picker. No min/max. Palette card is **Save from Clipboard**
+  (TOOLS), not "Save Clipboard" / "Copy to Clipboard".
 - **Wiring / companions:** Click the site's Copy control, then this.
   Launch always grants clipboard-read/write.
 - **When to use vs adjacent:** Copy-only UIs. Prefer Save Web Element /
@@ -833,6 +920,8 @@ See [write-javascript.md](write-javascript.md) for the full `zw` API.
 - **Gotchas:** Earlier helper comments claimed this control did not exist.
   It does. Clicking a random bottom-left coord can hit "toggle
   interactivity" instead — click the labeled controls button.
+  Auto-align top-to-bottom can yank sticky notes into a row. Place
+  notes after node layout, or skip auto-align once notes are placed.
 
 ## Sticky note (`sticky_note`)
 
@@ -848,6 +937,19 @@ See [write-javascript.md](write-javascript.md) for the full `zw` API.
   `"Write a note..."`; fill with
   [../scripts/zw_fill_notes.py](../scripts/zw_fill_notes.py)
   (label click or yellow double-click). `data.name` stays `None`.
+  Sit the note **next to** the node it documents, not in a top row.
+  Drag by the **top strip** only — a text-body drag selects text;
+  interactivity / lock off pans the pane instead of moving the note.
+  Palette drag-and-drop is flaky: drops in the far-left canvas often
+  produce nothing. Create the note in the mid/right canvas, type
+  text immediately, then drag by the **top strip** to the target
+  node. An empty note is discarded if you click away before typing.
+  When the react-flow control bar (zoom/fit/sticky-note drag) sits
+  below a 1280×800 viewport, palette sticky notes are unreachable
+  (live: Demo - HTTP + Math Pipeline). Workaround: each node's
+  speech-bubble icon (bottom-right of the card) → "Write a note…"
+  → SAVE. That attaches a note beside the node. Empty notes still
+  discard on click-away.
 
 ## Deactivate / shortcuts / inter-block delay
 
@@ -880,40 +982,43 @@ Internal canvas types also include `fake` and `delete` (not user-facing).
 | Block | Drawer fields (placeholder / type) |
 |---|---|
 | Open Link | textarea[`https://example.com`]; "open in new tab" cb; min/max sec |
-| Save Page URL | save-target picker |
-| Switch or Close Tab | radios: switch/close × latest/prev/next/URL-match/tab# |
-| Go Back or Forward | radios back/forward; min/max |
+| Save Page URL | Save current page URL to picker; no min/max |
+| Switch or Close Tab | Action Switch/Close; Target Latest/Previous/Next/Tab URL matching (full/partial/regex)/Tab number (default 1); min/max |
+| Go Back or Forward | radios Go back/Go forward (live default NEITHER — dead default footgun); min/max |
 | Launch Browser | bypass bot detection, background, maximize, window size, cookies, proxy, browser engine, launch args, scripts, page visibility (tri-state), sticky/incognito |
-| Quit Browser | Force quit checkbox |
-| Switch Frame | radios enter/exit (main) frame; iframe selector; min/max |
-| Browser Alert | textarea[response text]; min/max |
+| Quit Browser | Force quit checkbox (unchecked live); no min/max |
+| Switch Frame | radios Iframe / Main page (live default NEITHER — dead default, same class as Go Back); min/max 0/0 |
+| Browser Alert | optional Prompt response textarea; min/max 0/0; no Accept vs Dismiss control; palette label Browser Alert |
 | Click Web Element | textarea[CSS/XPath]; skip-if-not-found cb; open-in-new-tab cb; min/max |
-| Check Web Element | textarea[CSS/XPath]; timeout; TWO branch outputs (Found / Not Found) |
+| Check Web Element | selector CSS/XPath; Selector options; must-be-visible cb; min/max; Found/Not Found are **no-drawer** markers (edge wiring, not a field) |
 | Save Web Element | textarea[CSS/XPath]; Save-as (Text / Link / Custom attribute + "Enter attribute" / HTML / Image file URL); Save-to picker; skip-if-missing cb; min/max |
-| Insert Text or Data | textarea[content] + spintax cb; no-Enter cb; optional selector; typing speed; encrypt; instant-paste cb |
-| Hover Web Element | textarea[CSS/XPath]; min/max |
-| Select Web Dropdown | input[option]; textarea[dropdown selector]; min/max |
+| Insert Text or Data | Content textarea; Use spintax CHECKED by default; Don't press Enter; optional selector; speed slider PRO/FAST/AVERAGE/SLOW/VERY SLOW (~65-90 wpm FAST); Insert instantly cb; min/max |
+| Hover Web Element | selector + Selector options + min/max; NO must-be-visible cb |
+| Select Web Dropdown | Dropdown option; dropdown selector; Selector options; min/max |
 | Keyboard Action | key picker UI; min/max |
+| On Catch / After Try-Catch / Break Repeat / After Repeat / Found / Not Found / Abort Run | **No drawer** — select+click often opens nothing |
+| Raise Error | optional message (default "A custom error was raised."); Mark run failed in run report cb; Include in error report cb (both unchecked live) |
 | Start Repeat | Standard vs Dynamic; Fixed / Continue-until-no-element / Count-elements; repetition INPUT `Enter number of repetitions`; Auto-scroll; Start-from; Auto-continue |
 | Start / Set Condition | Start = value picker; Set = 18 operators + operand / Else |
 | Update Data | value textarea (empty = clear); two MUI selects; Use spintax cb |
 | Number Operations | Add/Subtract/Multiply/Divide/Remainder/Round/Round up/Round down/Random/Set decimals/Remove format; operands; save-to |
 | Format Data | Remove word / Replace / Shorten / case / Normalize URL / Trim / line breaks / smileys; input; save-to |
-| Split Text | separator + input + 1-based or negative positions + dests |
+| Split Text | live empty default: only Text to split picker; then separator + positions |
 | Apply Regex | Extract / Check / Replace; pattern `/example/`; Text-to-apply; Save result to |
 | Remove Duplicates | table picker; column; Preserve newest (native only) |
-| Delete Data | table picker; all rows vs one row |
+| Delete Data | live empty default: only Delete from picker; official all vs one |
 | Ask ChatGPT | Model select; prompt textarea; Save answer to |
-| Send Notification | input[email]; textarea[subject]; textarea[body] |
+| Send Notification | Subject; Email content; min/max; no To: field (signed-in account email) |
 | Send HTTP Request | Method; URL; HEADERS / BODY / SAVE RESPONSE; record path; status dest; min/max |
 | Write JavaScript | MONACO; Run locally cb |
-| Save File / Upload File | source radios; folder/path; file options; min/max |
+| Save File | source radios; folder/path; file options; min/max |
+| Upload File | previous-step Upload-button tip; From file URL / From folder path on your computer (live NEITHER); min/max |
 | Delay | min/max sec |
-| Record Date | format + save-to |
-| Take Screenshot | visible/full-page/element; png/jpeg; local folder |
-| Save from Clipboard | save-to |
+| Record Date | Select date format dropdown (nothing selected live); no min/max |
+| Take Screenshot | Visible page/Full page/Web element; .png/.jpeg; folder `/Users/<your-username>/Downloads`; File options; min/max |
+| Save from Clipboard | Save copied text to picker; no min/max |
 | Log | textarea[message]; tag; status (Success/Fail/Warning) |
-| Run TaskBot | bot picker or Custom id; var pairs; Wait until finishes |
+| Run TaskBot | Select a TaskBot dropdown; Wait until finishes CHECKED=sync / uncheck=fire-and-forget; no min/max |
 
 ## Save-to pickers (the fiddly part)
 

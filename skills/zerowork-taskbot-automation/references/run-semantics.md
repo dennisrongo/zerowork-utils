@@ -62,5 +62,7 @@ Setting them (right-click menu) writes `className: 'start'` / `className: 'end'`
 
 A paginated scraper · an advanced-logic bot (try-catch + regex + condition branches) · a
 no-try-catch control twin (the A/B proof pair) · a browserless HTTP+math+ChatGPT pipeline ·
-a node playground for drawer-schema harvesting (expect some dead husks if you experiment with
-type strings).
+a Node Playground living coverage map (65 nodes: 40 named/real, 25 dead
+`node-default` husks — expected there, never on a client bot; incomplete vs the 44;
+remaining playground holes: open_link, launch_browser, click, save, keyboard, loop,
+continue_after_repeat, write_js, log).

@@ -3,7 +3,7 @@
 Verified Aug 15, 2026 against creator.zerowork.io (React + MUI + React Flow, Monaco editor), using a throwaway demo bot in a test account.
 
 ## Editor layout
-- Left: block palette, grouped (BROWSER / WEB INTERACTION / LOGIC / DATA / EXTERNAL / FILES / TOOLS). ~45 blocks, each a `[draggable=true]` MUI card. Two search inputs: "Search by ID, name or type" (bottom-left, searches canvas nodes) and "Search blocks" (top-right, filters palette).
+- Left: block palette, grouped (BROWSER / WEB INTERACTION / LOGIC / DATA / EXTERNAL / FILES / TOOLS). ~45 blocks, each a `[draggable=true]` MUI card. Two search inputs: "Search by ID, name or type" (bottom-left, searches canvas nodes) and "Search blocks" (top-right, filters palette). Palette labels that do not match guessed names: Accept/Dismiss Dialog → **Browser Alert** (search "dialog"); Abort / Stop TaskBot → **Abort Run**; Email / Send Email → **Send Notification**; Insert Date → **Record Date**; Save Clipboard / Copy to Clipboard → **Save from Clipboard**.
 - Center: React Flow canvas. Each node = a block, `data-id` = numeric ZeroWork ID. Nodes have 4 handles: `a` top (target), `b` left (target), `a` bottom (source), `b` right (source).
 - Config drawer opens CENTER-screen (≈x 500-950), not right side. Common mistake: filtering for "right panel" inputs and finding nothing.
 - Toolbar (top-right, y<40): Run (`aria-label="Run"`), Detect errors, Schedule, Webhook, Reports, Browser launch settings.
@@ -28,10 +28,15 @@ item.dispatchEvent(mk('dragend',   r.x+300, r.y+200));
 - IMPORTANT ORDERING BUG: the drop→configure→SAVE pattern configures the NEWEST node. If you re-drop a block to reopen its drawer and then delete "the duplicate", you may delete the configured one. Sequence: re-drop → configure new → SAVE → delete the OLD node id.
 
 ## Opening an existing node's drawer
-- Click the **icon body** of a large-enough card. Search-by-ID (bottom-left)
-  **selects** the node (shows `ID <n>`) but does **not** open settings.
+- Click the **icon body** of a large-enough card. Working recipe:
+  select-click, then a **second click on the card body**. First click
+  often only **selects** the node (shows `ID <n>`) and does **not**
+  open settings. Search-by-ID (bottom-left) is the same select-only trap.
   Right-click menu is Deactivate / Duplicate / Copy / Start-run-from-here —
   there is no Settings item.
+- Catch / After-Try / Break / After-Repeat / Abort Run: select+click
+  often opens **no drawer** (no configurable fields). That is
+  expected, not a failed open — do not retry forever.
 - After fit-view, cards shrink and clicks only select. Zoom in until the
   card is ~100px+, keep the target in the viewport (far nodes cull), then
   click. `scrollIntoView` on a culled node is not enough — React Flow has
@@ -121,12 +126,14 @@ when you need pixels (drawer open / toast).
 4. Live Runs (bottom-right) can cover cards near the bottom of the
    canvas. Click the panel's **Minimize** control, then re-snapshot,
    then click the card.
-5. A click that only **selects** (card shows `ID <n>` + a small
-   settings badge) is not a drawer open. Live: even a 130×130
-   Group, background then **same** index foreground, still only
-   selected — Open Link, Delay, and Write JS alike. Do not spend
-   the rest of the turn repeating that click. Escalate: human
-   click, or page-JS
+5. Drawer open is **two clicks**: select-click, then a **second
+   click on the card body**. First click often only **selects**
+   (card shows `ID <n>` + a small settings badge) — that is not
+   a drawer open. Live: even a 130×130 Group, background then
+   **same** index foreground, still only selected — Open Link,
+   Delay, and Write JS alike. After the select, click the card
+   body once more. If two clicks still only select, do not loop
+   forever — escalate: human click, or page-JS
    `monaco.editor.getEditors()[0].getModel().setValue` once a
    human has the drawer open.
 6. SendInput palette-drag can **drop** a new node without
@@ -196,7 +203,7 @@ The creator window must be the actual foreground window among
 that Chrome pid (see "Same Chrome pid, several windows").
 Rename and note type-in were no-ops until `bring_to_front`.
 
-Name nodes by job (`Clear previous rows`, `Page down to load more`).
+Name nodes by job (`Clear previous rows`, `Harvest while scroll`).
 Use `sticky_note`s for login / selectors / stop conditions — notes
 are not executed and REST-create as empty `"Write a note..."`.
 Repo CLIs: `python scripts/zw_rename.py --map "Open Link=Open X home"`
@@ -209,6 +216,48 @@ visible text survives reload. Single-click can show the color
 toolbar without committing text. Yellow centroids:
 `zw_canvas.yellow_centroids(shot)` / `zw_fill_notes.py --yellow`.
 
+### Sticky notes — place and drag (live, Demo - X Feed Scraper)
+
+Notes sit **next to the node they document**, not in a top row.
+
+Drag a note by the **top strip** only. A drag that starts on the
+text body selects text. If interactivity / lock is off, a drag
+pans the pane instead of moving the note — turn interactivity
+back on, then grab the strip.
+
+Palette drag-and-drop for sticky notes is flaky. Drops in the
+far-left canvas often produce nothing. Workaround: create the
+note in the mid/right canvas, type text immediately, then drag
+by the **top strip** to the target node.
+
+An empty note is discarded if you click away before typing.
+
+Auto-align top-to-bottom can yank notes into a horizontal row.
+Place notes **after** node layout, or skip auto-align once notes
+are placed.
+
+X-feed notes that belong on that canvas (exact copy):
+
+- "Agent Chrome must be signed into X. Creator tab login does not count."
+  → next to Launch Chrome / Open X home
+- "Write JS harvest-while-scroll: X remounts tweet cards. Dedup column is post_id."
+  → right of Harvest while scroll
+- "Stop after 3 empty scroll rounds or 40 unique posts."
+  → lower-right of Harvest while scroll
+- "Outer N = scroll rounds, not tweet count."
+  → right of Scroll rounds
+
+### Sticky notes — palette unreachable (live, Demo - HTTP + Math Pipeline)
+
+When the react-flow control bar (zoom/fit/sticky-note drag) sits
+below a 1280×800 viewport, palette sticky notes are unreachable.
+
+Workaround: each node's speech-bubble icon (bottom-right of the
+card) → "Write a note…" → SAVE. That attaches a note beside
+the node.
+
+Empty notes still discard on click-away.
+
 ### Monaco (Write JavaScript)
 
 If a human is in this drawer (or pastes **Copy AI instructions**),
@@ -216,6 +265,9 @@ give one pasteable script — do not type it in. Contract:
 [write-javascript.md](write-javascript.md) "Authoring for a human".
 
 Page JS (when you have it): `monaco.editor.getEditors()[0].getModel().setValue(code)`.
+That is the live-verified write for `templates/x_feed_harvest.js`.
+UIA `set_value` does not land. Leave **Run locally** unchecked
+(in-page harvest — the script reads the X DOM).
 
 On the paired Chrome via cua-driver (no page JS):
 
@@ -237,8 +289,20 @@ newlines. After a foreground type-in, SAVE immediately — do not assume
 ### Detect errors + Run
 
 - **Detect errors** can sit on *"Checking for disconnected blocks or
-  missing input data, please wait..."* for a long time. That toast is
-  not a hard lock: **Run** still starts (it runs the same validator).
+  missing input data, please wait..."* for a long time, sometimes
+  with **no result banner**. That toast is not a hard lock: **Run**
+  still starts (it runs the same validator).
+- Empty **unconnected** Write JS nodes fail Detect errors. Delete
+  orphan husks (palette-drag leftovers). Keep one connected Write
+  JS named **Harvest while scroll** when that is the X harvest
+  path; fill it from `templates/x_feed_harvest.js`. On the JS demo,
+  Harvest sits **before** Try, not as a sibling off Try.
+- Start Try-Catch may have **at most three connections** (one body
+  + On Catch + After Try-Catch). A Write JS sibling off Try is a
+  fourth wire and fails Detect errors: "The Start Try-Catch
+  building block can have up to three connections...". Valid JS
+  demo: Wait for timeline → Harvest while scroll → Scrape scope
+  (try) → (Scroll rounds | catch | after_try).
 - Run is the toolbar UIA Button `"Run"` (`aria-label="Run"`) on the
   **paired** creator window. Same background-then-foreground click
   rule. While a run is live the button's name becomes `"running"`.

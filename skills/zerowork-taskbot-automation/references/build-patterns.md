@@ -58,20 +58,124 @@ Open Link → Write JS (scrape via document.querySelectorAll, then per-row
 No loop blocks needed at all. Monaco editor: set code via
 `monaco.editor.getEditors()[0].getModel().setValue(code)`.
 
-## Pattern 4 — advanced logic pipeline (verified)
+## Pattern 4 — advanced logic pipeline (verified live: Demo - Advanced Logic)
 
-Open → Try → [click(.nonexistent) → caught] → After-Try → Log → Update Data (`£51.77` →
-var) → Regex Replace `/£/` → '' → var → Start Condition (price_clean) → Set Condition
-(> 50) → Log HIGH / Else Set Condition → Log LOW.
+Live bot name is a label only. Do **not** treat a workflow id or node
+id as a required handle. Rebuild from this recipe; pick refs with
+**V / My references**, never paste another bot's `{id,name}` id.
 
-Wiring rules: catch AND after_try hook directly off the try node. Numeric comparisons
-throw on non-numeric strings — sanitize first. Full wiring rules: rest-api.md.
+```
+Open Link  https://books.toscrape.com/   (current tab — new-tab off)
+→ Start Try-Catch                       **at most 3 wires**
+     → Click Web Element                body: intentional miss
+     → On Catch Error                   NO drawer, NO outgoing edge
+     → After Try-Catch                  NO drawer
+→ Log                                   proof the run continued
+→ Update Data                           Variables.price_raw = £51.77
+→ Apply Regex                           Replace /£/ → '' → price_clean
+→ Start Condition                       Variables → price_clean
+     → Set Condition  > 50              → Log HIGH
+     → Set Condition  Else              (include Else; LOW string not captured)
+→ Start Repeat                          set Standard (live was UNSET)
+     → Start Condition                  Variables → price_clean
+          → Set Condition  > 50         → Break Repeat
+     → After Repeat                     NO drawer
+```
 
-## Pattern 5 — browserless data pipeline (verified, ~1-5s runs)
+**Live drawer / wiring a weaker model must fill** (Detect errors
+quiet ≠ filled):
 
-Send HTTP (GET api) → math (op on value) → Ask ChatGPT (prompt referencing the var,
-answer → var) → Log (interpolates both). No browser launch: run completes in ~1s; with
-ChatGPT ~5s. Duration is the signature that blocks actually executed.
+| Node | Live | Notes |
+|---|---|---|
+| Open Link | `https://books.toscrape.com/` | current tab (new-tab **off**) |
+| Click Web Element | selector `definitely-not-present-element` | **intentional miss**. Left click. Human-like **off**. Skip-if-not-found **off** (must throw). |
+| On Catch Error | no drawer | **dead-end on purpose** — no outgoing edge. Do not wire catch → log. |
+| After Try-Catch | no drawer | continue path. Wire `try → after_try → Log`. |
+| Log (proof) | message `TRY-CATCH TEST: run continued after error` | status **Success**. This log is the try-catch proof. |
+| Update Data | Variables → `price_raw` = `£51.77` | auto Variables table, not a new table. |
+| Apply Regex | method **Replace text**; pattern `/£/`; replacement empty | source `{id, name: price_raw}` via **V / My references**. Destination not fully captured — treat as `price_clean`. Do **not** copy a 5-digit-looking live id. |
+| Start Condition | Variables → `price_clean` | two Set Condition nodes, **one operator each**. |
+| Set Condition (high) | `>` `50` | → Log `PRICE HIGH branch taken (>50)` |
+| Set Condition (else) | **Else** | always include Else. LOW log string was not captured. |
+| Start Repeat | live loop type was **UNSET** | neither Standard nor Dynamic selected. **Footgun:** Detect errors may stay quiet. Set **Standard** before a client build. |
+| Loop Start Condition | Variables → `price_clean` `>` `50` | inside the loop. |
+| Break Repeat | no drawer | off that Set Condition, **not** after the last body block. |
+| After Repeat | no drawer | off Start Repeat (second output). |
+
+**Catch-dead-end is intentional.** On Catch Error has no outgoing
+edge and no drawer. After Try-Catch also has no drawer. The proof
+that the error was swallowed is the Log **after** After Try-Catch
+(`TRY-CATCH TEST: run continued after error`, Success). Wiring
+`catch → log` is the wrong rebuild.
+
+**No-drawer companions.** Catch / After-Try / Break / After-Repeat:
+select+click often opens **no drawer** (no configurable fields).
+Do not retry forever or treat that as a failed open.
+
+**Detect errors toast** can hang with only "please wait" and no result banner. That is not a hard lock — Run still starts.
+
+**Sticky notes.** None were on the live bot when found. Teaching
+notes that belong (place next to the node, after layout):
+
+- "Click: intentional miss"
+- "Catch: no outgoing edge on purpose; after_try is the proof"
+- "Regex: strip £"
+- "Start Condition: one operator per Set Condition + Else"
+- "Start Repeat: set Standard"
+- "Break: off Set Condition, not after last body"
+
+Numeric `<` `>` throw on non-numeric strings — strip `£` first.
+Full wiring rules: rest-api.md.
+
+## Pattern 5 — HTTP + math pipeline (verified live: Demo - HTTP + Math Pipeline)
+
+Live bot name is a label only. Do **not** treat a workflow id or node
+id as a required handle. Rebuild from this recipe; pick refs with
+**V / My references**, never paste another bot's `{id,name}` id.
+
+```
+Send HTTP Request
+→ Number Operations
+→ Log
+     → Ask ChatGPT
+     → Log
+```
+
+Live: **5 nodes, no notes.** Spine is Send HTTP Request → Number
+Operations → Log; that Log also branches to Ask ChatGPT → Log.
+
+**Live drawer / wiring a weaker model must fill** (Detect errors
+quiet ≠ filled):
+
+| Node | Live | Notes |
+|---|---|---|
+| Send HTTP Request | GET `https://api.frankfurter.app/latest?from=USD&to=GBP` | no headers, no body. **SAVE RESPONSE** tab: body, nested path, and status code **ALL EMPTY**. The HTTP call is a **no-op**. |
+| Number Operations | **Multiply**, `fx_x100` × **2.5**, write back to `fx_x100` | pick `{id, name: fx_x100}` via **V / My references**. Do **not** copy a live variable id. |
+| Log | `Result: {fx_x100}` | status **Success**. This Log also branches to Ask ChatGPT. |
+| Ask ChatGPT | model **ChatGPT 5.5** (`gpt-5.5`) | prompt `Classify this number as HIGH or LOW in one word, nothing else: {fx_x100}`; answer → variable `gpt_answer` via **V / My references**. |
+| Log | `ChatGPT says: {gpt_answer}` | status **Success**. |
+
+**Empty SAVE RESPONSE is a no-op.** Body, nested path, and status
+code were all empty on the live bot. Detect errors can stay quiet
+while the API result is discarded. This is the Pattern 5 **footgun**
+— same class as Pattern 4's UNSET loop type. Fill SAVE RESPONSE
+(body and/or nested path and/or status) or the GET never lands in a
+variable. Duration ~1s still looks "successful".
+
+**Detect errors toast** can hang with only "please wait" and no
+result banner (same as Advanced Logic). That is not a hard lock —
+Run still starts.
+
+**Sticky notes.** None were on the live bot when found. Teaching
+notes that belong (place next to the node, after layout):
+
+- "HTTP must SAVE RESPONSE or the call is a no-op"
+- "math writes back to fx_x100"
+- "ChatGPT one-word classify"
+
+No browser launch: run completes in ~1s; with ChatGPT ~5s.
+Duration is the signature that blocks actually executed. Duration
+alone does **not** prove the HTTP body was saved.
 
 ## Pattern 6 — LinkedIn home-feed scrape (SPA, infinite scroll)
 
@@ -173,59 +277,158 @@ Clear previous rows          delete_table_data (all rows)
 → Launch Chrome (bypass)     launch_browser
 → Open X home                open_link https://x.com/home
 → Wait for timeline          sleep 4–6s
-→ Scrape scope               try
-     → Scroll rounds         loop  Standard, Fixed 6
-          → Save visible tweets   loop  Standard, Count article[data-testid=tweet]
+→ Harvest while scroll       write_js   (JS demo: BEFORE Try, not a Try sibling)
+→ Scrape scope               try        **at most 3 wires**
+     → Scroll rounds         loop  Standard, Fixed 6, auto-scroll off
+          → Save visible tweets   loop  Standard, Count article[data-testid="tweet"]
                → Save post URL / author / text / time   save × N, XPath {loop_index}
           → After tweet loop      continue_after_repeat  (off inner loop)
-               → Page down        keyboard  PageDown / End
-               → Wait for new tweets  sleep 2s
+               → Page down        keyboard  PageDown (or End) — empty key fails the scrape
+               → Wait for new tweets  sleep 2s (recipe default; live Demo was min 1 / max 1 — do not silently change the live bot)
      → On scrape error       catch → log
      → After scrape          after_try → remove_duplicate_rows (post_url) → log
 ```
 
-**Selectors (XPath, inner `{loop_index}`):**
+No-code-only (omit Harvest / delete the Write JS husk): Wait for
+timeline → Scrape scope (try) → (Scroll rounds | catch | after_try).
+JS demo (live, Demo - X Feed Scraper): Wait for timeline → Harvest while scroll → Scrape scope (try) → (Scroll rounds | catch | after_try).
+Never wire `try → harvest` **and** `try → outer` — that fourth wire
+fails Detect errors: "The Start Try-Catch building block can have up to three connections...".
 
-```
-(//article[@data-testid="tweet"])[{loop_index}]//a[contains(@href,"/status/")]
-(//article[@data-testid="tweet"])[{loop_index}]//*[@data-testid="User-Name"]
-(//article[@data-testid="tweet"])[{loop_index}]//*[@data-testid="tweetText"]
-(//article[@data-testid="tweet"])[{loop_index}]//time
-```
+**Post-assemble drawer fill (no REST write).** After
+`zw_assemble.py` drops the graph, open each drawer (select-click,
+then a **second click on the card body** — first click often only
+shows `ID <n>`) and set the values below. Same objects live on
+[../templates/x_feed_nocode.json](../templates/x_feed_nocode.json)
+under each node's `fill` key (`text` / `source` are the note/Monaco
+hints). REST assemble ignores `fill` / `text` / `source`. There is
+no REST drawer write. Do not treat a workflow id or node id as a
+required handle.
 
-Save-as: **Link** (post_url), **Text** (author, post_text), **Custom
-attribute** `datetime` (posted_at). Skip-if-missing on tweetText
-(media-only posts). Dedup column = `post_url` (never empty).
+Live drawer state a weaker model must fill (Detect errors quiet ≠
+filled):
+
+| Node | Live | Selector / mode | Save as | table.column | skip |
+|---|---|---|---|---|---|
+| Save post URL | fully set | `(//article[@data-testid='tweet'])[{loop_index}]//a[contains(@href,'/status/')]` | **Link** | `x_feed_posts.post_url` | unchecked |
+| Save author | EMPTY selector, no table | `(//article[@data-testid="tweet"])[{loop_index}]//*[@data-testid="User-Name"]` | **Text** | `x_feed_posts.author` | |
+| Save tweet text | EMPTY | `(//article[@data-testid="tweet"])[{loop_index}]//*[@data-testid="tweetText"]` | **Text** | `x_feed_posts.post_text` | skip-if-missing **ON** |
+| Save posted time | node **exists** (below Save tweet text, already wired), drawer EMPTY | `(//article[@data-testid="tweet"])[{loop_index}]//time` | **Custom attribute** `datetime` | `x_feed_posts.posted_at` | skip-if-missing **ON** |
+| Clear previous rows | | table `x_feed_posts`, **Delete all rows** | | | |
+| Launch Chrome (bypass) | | Bypass bot detection **On**; everything else **Use current defaults** | | | |
+| Open X home | | `https://x.com/home` | | | |
+| Wait for timeline | | min **4** / max **6** | | | |
+| Wait for new tweets | live min **1** / max **1** (not empty) | recipe default min **2** / max **2** — do not silently change the live bot | | | |
+| Keep unique posts | was `post_id` | table `x_feed_posts`, column **`post_url`**, Preserve newest **unchecked** | | | |
+| Scroll rounds | | Standard, Fixed **6**, auto-scroll **off** | | | |
+| Save visible tweets | | Standard, Count `article[data-testid="tweet"]` | | | |
+| Page down to load more | key **EMPTY** | key **PageDown** (or End) | | | |
+
+Save posted time **exists** (below Save tweet text, already wired).
+Its drawer was empty — fill it. Do not assume the time node is
+missing. SAVE succeeded with that selector / Custom attribute
+`datetime` / skip-if-missing ON / `x_feed_posts.posted_at`.
+
+Wait for new tweets: recipe default is min 2 / max 2 (~2s). Live
+Demo - X Feed Scraper was min 1 / max 1 (not empty). Do not
+silently change the live bot to 2s.
+
+Keep unique posts: table `x_feed_posts`, column `post_url`
+(changed from `post_id` to match this recipe). Preserve newest
+unchecked.
+
+After these fills, Detect errors: "Good news! The basic check found no errors."
+
+Empty PageDown key fails a real scrape even when Detect errors is
+quiet about it. No-code dedup column = `post_url` (never empty).
+Live Write JS harvest dedup column = `post_id`.
 
 Each outer round re-saves whatever cards are mounted; Remove
 Duplicates collapses remounts. `item/get_count/` growing across
 rounds (or Live Runs showing PageDown + N unique URLs) is the
 pagination proof.
 
-**Sticky notes to leave on the canvas:** (1) Agent Chrome must be
-signed into X — Creator tab login does not count. (2) Outer N = scroll
-rounds, not tweet count. (3) If mounted card count stays ~6–8 and
-dedupe leaves almost that many, the virtualizer won — then Write JS
-harvest-while-scroll (Pattern 6) is justified.
+**Live-verified harvest (Demo - X Feed Scraper):** X remounts tweet
+cards, so `{loop_index}` cannot hold a stable list. One connected
+Write JS named **Harvest while scroll**, on the spine **before**
+Scrape scope (try) — not a sibling off Try (that is the fourth
+wire). Browser execution — leave **Run locally**
+unchecked. Fill Monaco with page JS
+`monaco.editor.getEditors()[0].getModel().setValue(code)` from
+[../templates/x_feed_harvest.js](../templates/x_feed_harvest.js)
+(`getTaskbotInfo()`, not a copied table id). UIA `set_value` does
+not land. Dedup column = `post_id` (status id). The script stops
+after 3 empty scroll rounds or 40 unique posts — that is its own
+loop, not outer N.
 
-**When Write JS is required:** Save WE keeps writing the same six
-`post_url`s after PageDown, or Keyboard does not move the X
-scroller. Then harvest-while-scroll + status-id Set (Pattern 6
-shape), still inside Try-Catch. Do not start from Write JS.
-Pasteable script: [../templates/x_feed_harvest.js](../templates/x_feed_harvest.js)
-(`getTaskbotInfo()`, not a copied table id). No-code graph spec:
-[../templates/x_feed_nocode.json](../templates/x_feed_nocode.json).
+Empty unconnected Write JS nodes fail Detect errors. Delete
+orphan husks. Keep exactly one connected Write JS named
+**Harvest while scroll**.
+
+The nested Save WE + Keyboard graph is the no-code body **inside**
+Try. The spec
+[../templates/x_feed_nocode.json](../templates/x_feed_nocode.json)
+already uses the valid 3-wire graph: Harvest on the spine before
+Try, Try body = Scroll rounds, plus catch and after_try. `fill` /
+`text` / `source` are post-assemble hints — REST cannot write
+drawer fields, note bodies, or the Monaco buffer. Do not add a
+fourth edge off `try`.
+
+**Sticky notes sit next to the node they document, not a top
+row.** Four notes (exact copy):
+
+- "Agent Chrome must be signed into X. Creator tab login does not count."
+  → next to Launch Chrome / Open X home
+- "Write JS harvest-while-scroll: X remounts tweet cards. Dedup column is post_id."
+  → right of Harvest while scroll
+- "Stop after 3 empty scroll rounds or 40 unique posts."
+  → lower-right of Harvest while scroll
+- "Outer N = scroll rounds, not tweet count."
+  → right of Scroll rounds
+
+Drag a note by the **top strip** only. Text-body drag = text
+select. Interactivity / lock off = pan, not drag.
+
+Auto-align top-to-bottom can yank notes into a row. Place notes
+**after** node layout, or skip auto-align once notes are placed.
 
 **Rename:** dblclick the node title, **Ctrl+A**, type the job name,
 Enter. Without Ctrl+A, type_text appends to the default label.
 
-**Live structure:** Demo X Feed Scraper was rebuilt off Write JS onto
-this nested-loop + Keyboard PageDown graph, with sticky notes for
-login / scroll-rounds / virtualizer fallback. Drawer config for the
-new Save WE / inner-loop selectors is the remaining last mile
-(Detect errors will name empty required fields until those are
-SAVEd). Verify with `item/get_count/` + Live Runs PageDown lines,
-not `execution.success`.
+**Live structure:** Demo - X Feed Scraper runs the Write JS
+harvest-while-scroll path (X remounts cards). Detect errors
+named empty unconnected Write JS husks until orphans were
+deleted and the one remaining Write JS was connected and
+named Harvest while scroll. Verify with `item/get_count/` +
+Live Runs harvest / scroll-round lines, not `execution.success`.
+
+
+## Node Playground — living coverage map
+
+Live bot name is a label only. Do **not** treat a workflow id or node
+id as a required handle.
+
+Demo - Node Playground is a **living coverage map** of palette types,
+not a client bot and not a rebuild recipe. Drawer-schema harvesting
+ground. Wrong type strings render as dead husks — **expected here**.
+Never ship `node-default` husks on a client bot; verify class is
+`react-flow__node-<type>`.
+
+**Live census** (incomplete vs the 44 in node-types.md):
+
+- 65 canvas nodes: 40 named/real types, 25 dead husks
+- Husks: `react-flow__node-default`, no label
+- One sticky note, empty placeholder "Write a note..."
+- Detect errors can hang on please wait with no result banner (same as other demos)
+- Nine former holes were dropped onto this playground (see named list)
+
+**Named types present:** `check`, `element_present`, `element_absent`, `hover`, `select`, `run_taskbot`, `update_variable`, `format_data`, `delete_table_data`, `ask_chatgpt`, `sticky_note`, `tabs`, `save_file`, `sleep`, `update_or_configure_api`, `math`, `throw`, `catch`, `try`, `after_try`, `loop_exit`, `check_dynamic_data`, `conditionNode`, `split_data`, `regex`, `remove_duplicate_rows`, `screenshot`, `insert_data`, `navigate`, `save_url`, `quit_browser`, `switch_frame`, `accept_dialog`, `abort`, `email`, `upload`, `insert_date`, `save_clipboard`.
+
+**Palette types NOT on this playground** (remaining coverage holes):
+`open_link`, `launch_browser`, `click`, `save`, `keyboard`, `loop`, `continue_after_repeat`, `write_js`, `log`.
+Those nine are already covered on Demo - X Feed Scraper / Demo - Advanced Logic — absent from this playground only.
+
+Full type table: [node-types.md](node-types.md).
 
 ## Working reference bots
 
@@ -236,6 +439,11 @@ Keep a set of demo bots in a scratch/test account as living documentation:
 - **Control twin** — the same failing click WITHOUT try-catch (errors by design —
   the A/B proof pair for the try-catch bot).
 - **HTTP + math pipeline** — Pattern 5, browserless.
-- **Node playground** — drawer-schema harvesting ground; expect dead husks if you
-  experiment with type strings.
+- **Node Playground** — living coverage map of palette types (not a client bot).
+  Live: 65 canvas nodes (40 named/real, 25 dead `react-flow__node-default` husks, no label).
+  Wrong type strings render as husks — expected here. One empty sticky ("Write a note...").
+  Detect errors can hang on please wait. Incomplete vs the 44: remaining holes `open_link`, `launch_browser`, `click`, `save`, `keyboard`, `loop`, `continue_after_repeat`, `write_js`, `log`.
+  Those nine are already covered on X-feed / Advanced Logic. Never ship
+  `node-default` husks on a client bot; verify class is `react-flow__node-<type>`.
+  Do not treat a workflow id or node id as a required handle.
 - One bot whose loop wiring you already trust (read-only) as a reference.

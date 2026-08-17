@@ -5,8 +5,9 @@ Extracted from the ZeroWork app bundle (`useHighlightNode-*.js` enum; also visib
 API accepts ANY type string with a 200 — wrong strings silently render as dead
 `react-flow__node-default` husks (no card body, no config drawer, inert at run). After
 `POST /node/`, verify the rendered node's class is `react-flow__node-<type>`; `node-default`
-= wrong type string. Husks are undeletable via REST and clutter the canvas — get types right
-the first time.
+= wrong type string. **Never ship `node-default` husks on a client bot.** Husks are
+undeletable via REST and clutter the canvas — get types right the first time. Demo -
+Node Playground is the living coverage map (25 husks expected there; see below).
 
 | UI block | `type` string | Official docs |
 |---|---|---|
@@ -111,4 +112,49 @@ Counterintuitive mappings that bit hard (guessed → real): `delay`→`sleep`,
 `insert_text`→`insert_data`, `break_repeat`→`loop_exit`, `start_condition`→`check_dynamic_data`,
 `set_condition`→`conditionNode`, `on_catch_error`→`catch`, `after_try_catch`→`after_try`,
 `try_catch`→`try`. Note `element_present`/`element_absent` are the Found/Not-Found branch
-markers of `check`, not standalone configurable blocks.
+markers of `check`, not standalone configurable blocks. They are
+**no-drawer** Found / Not Found outcome marker cards — select+click opens nothing.
+Branching is edge wiring off `check`, not a drawer field.
+
+## Palette label map (guessed name → actual card)
+
+Search the palette by the **actual** card label. These guessed names
+do not appear on a card:
+
+- Accept/Dismiss Dialog → **Browser Alert** (BROWSER). Only dialog
+  block; search "dialog" returns this. Type `accept_dialog`.
+- Abort / Stop TaskBot → **Abort Run** (LOGIC). **No drawer**, no
+  configurable fields. Type `abort`.
+- Email / Send Email → **Send Notification** (EXTERNAL). Drawer copy
+  says the email will be sent to the signed-in account email — **no
+  To: field**. Type `email`.
+- Insert Date → **Record Date** (TOOLS). Type `insert_date`.
+- Save Clipboard / Copy to Clipboard → **Save from Clipboard**
+  (TOOLS). Type `save_clipboard`.
+
+## Living coverage map (Demo - Node Playground)
+
+Live bot name is a label only. Do **not** treat a workflow id or node
+id as a required handle.
+
+The playground is a **living coverage map** of palette `type` strings —
+not a client bot. Wrong type strings render as dead husks. That is
+**expected here**. Never ship those husks on a client bot.
+
+**Live census** (incomplete vs the 44):
+
+- 65 canvas nodes: 40 named/real types, 25 dead husks
+- Husks: class `react-flow__node-default`, no label
+- One sticky note, empty placeholder "Write a note..."
+- Detect errors can hang on please wait with no result banner (same as other demos)
+- Nine former holes were dropped onto this playground (see named list)
+
+**Husk lesson:** never ship `node-default` husks on a client bot.
+After `POST /node/`, verify the rendered class is `react-flow__node-<type>`.
+`node-default` = wrong type string.
+
+**Named types present:** `check`, `element_present`, `element_absent`, `hover`, `select`, `run_taskbot`, `update_variable`, `format_data`, `delete_table_data`, `ask_chatgpt`, `sticky_note`, `tabs`, `save_file`, `sleep`, `update_or_configure_api`, `math`, `throw`, `catch`, `try`, `after_try`, `loop_exit`, `check_dynamic_data`, `conditionNode`, `split_data`, `regex`, `remove_duplicate_rows`, `screenshot`, `insert_data`, `navigate`, `save_url`, `quit_browser`, `switch_frame`, `accept_dialog`, `abort`, `email`, `upload`, `insert_date`, `save_clipboard`.
+
+**Palette types NOT on this playground** (remaining coverage holes vs the 44):
+`open_link`, `launch_browser`, `click`, `save`, `keyboard`, `loop`, `continue_after_repeat`, `write_js`, `log`.
+Those nine are already covered on Demo - X Feed Scraper / Demo - Advanced Logic — absent from this playground only.

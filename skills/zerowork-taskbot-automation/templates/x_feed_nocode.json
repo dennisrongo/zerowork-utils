@@ -1,5 +1,6 @@
 {
   "name": "Demo - X Feed Scraper",
+  "post_assemble": "Keys fill, text, and source are post-assemble drawer/note/Monaco hints. REST assemble ignores them \u2014 there is no REST drawer write. Do not treat a workflow id or node id as a required handle.",
   "table": {
     "name": "x_feed_posts",
     "columns": [
@@ -19,47 +20,323 @@
     ]
   },
   "nodes": [
-    {"key": "delete", "type": "delete_table_data", "x": 320, "y": 0, "name": "Clear previous rows"},
-    {"key": "launch", "type": "launch_browser", "x": 320, "y": 200, "name": "Launch Chrome (bypass)"},
-    {"key": "open", "type": "open_link", "x": 320, "y": 400, "name": "Open X home"},
-    {"key": "delay", "type": "sleep", "x": 320, "y": 600, "name": "Wait for timeline"},
-    {"key": "try", "type": "try", "x": 320, "y": 800, "name": "Scrape scope"},
-    {"key": "outer", "type": "loop", "x": 40, "y": 920, "name": "Scroll rounds"},
-    {"key": "inner", "type": "loop", "x": 40, "y": 1140, "name": "Save visible tweets"},
-    {"key": "save_url", "type": "save", "x": 40, "y": 1360, "name": "Save post URL"},
-    {"key": "save_author", "type": "save", "x": 40, "y": 1540, "name": "Save author"},
-    {"key": "save_text", "type": "save", "x": 40, "y": 1720, "name": "Save tweet text"},
-    {"key": "save_time", "type": "save", "x": 40, "y": 1900, "name": "Save posted time"},
-    {"key": "after_inner", "type": "continue_after_repeat", "x": 430, "y": 1140, "name": "After tweet loop"},
-    {"key": "pagedown", "type": "keyboard", "x": 430, "y": 1360, "name": "Page down to load more"},
-    {"key": "wait_new", "type": "sleep", "x": 430, "y": 1540, "name": "Wait for new tweets"},
-    {"key": "catch", "type": "catch", "x": 700, "y": 1040, "name": "On scrape error"},
-    {"key": "log_err", "type": "log", "x": 700, "y": 1260, "name": "Log scrape error"},
-    {"key": "after_try", "type": "after_try", "x": 320, "y": 2100, "name": "After scrape"},
-    {"key": "dedupe", "type": "remove_duplicate_rows", "x": 320, "y": 2280, "name": "Keep unique posts"},
-    {"key": "log_ok", "type": "log", "x": 320, "y": 2460, "name": "Log scrape done"},
-    {"key": "note_login", "type": "sticky_note", "x": -280, "y": 200, "name": "note_login"},
-    {"key": "note_scroll", "type": "sticky_note", "x": 720, "y": 880, "name": "note_scroll"},
-    {"key": "note_virtualizer", "type": "sticky_note", "x": 720, "y": 1500, "name": "note_virtualizer"}
+    {
+      "key": "delete",
+      "type": "delete_table_data",
+      "x": 320,
+      "y": 0,
+      "name": "Clear previous rows",
+      "fill": {
+        "table": "x_feed_posts",
+        "scope": "Delete all rows"
+      }
+    },
+    {
+      "key": "launch",
+      "type": "launch_browser",
+      "x": 320,
+      "y": 200,
+      "name": "Launch Chrome (bypass)",
+      "fill": {
+        "bypass_bot_detection": "On",
+        "other_groups": "Use current defaults"
+      }
+    },
+    {
+      "key": "open",
+      "type": "open_link",
+      "x": 320,
+      "y": 400,
+      "name": "Open X home",
+      "fill": {
+        "url": "https://x.com/home"
+      }
+    },
+    {
+      "key": "delay",
+      "type": "sleep",
+      "x": 320,
+      "y": 600,
+      "name": "Wait for timeline",
+      "fill": {
+        "min": 4,
+        "max": 6
+      }
+    },
+    {
+      "key": "harvest",
+      "type": "write_js",
+      "x": 320,
+      "y": 800,
+      "name": "Harvest while scroll",
+      "source": "templates/x_feed_harvest.js"
+    },
+    {
+      "key": "try",
+      "type": "try",
+      "x": 320,
+      "y": 1000,
+      "name": "Scrape scope"
+    },
+    {
+      "key": "outer",
+      "type": "loop",
+      "x": 40,
+      "y": 1120,
+      "name": "Scroll rounds",
+      "fill": {
+        "repeat": "Standard",
+        "count": "Fixed",
+        "times": 6,
+        "auto_scroll": false
+      }
+    },
+    {
+      "key": "inner",
+      "type": "loop",
+      "x": 40,
+      "y": 1340,
+      "name": "Save visible tweets",
+      "fill": {
+        "repeat": "Standard",
+        "count": "Count",
+        "selector": "article[data-testid=\"tweet\"]"
+      }
+    },
+    {
+      "key": "save_url",
+      "type": "save",
+      "x": 40,
+      "y": 1560,
+      "name": "Save post URL",
+      "fill": {
+        "selector": "(//article[@data-testid='tweet'])[{loop_index}]//a[contains(@href,'/status/')]",
+        "save_as": "Link",
+        "table": "x_feed_posts",
+        "column": "post_url",
+        "skip_if_missing": false
+      }
+    },
+    {
+      "key": "save_author",
+      "type": "save",
+      "x": 40,
+      "y": 1740,
+      "name": "Save author",
+      "fill": {
+        "selector": "(//article[@data-testid=\"tweet\"])[{loop_index}]//*[@data-testid=\"User-Name\"]",
+        "save_as": "Text",
+        "table": "x_feed_posts",
+        "column": "author"
+      }
+    },
+    {
+      "key": "save_text",
+      "type": "save",
+      "x": 40,
+      "y": 1920,
+      "name": "Save tweet text",
+      "fill": {
+        "selector": "(//article[@data-testid=\"tweet\"])[{loop_index}]//*[@data-testid=\"tweetText\"]",
+        "save_as": "Text",
+        "skip_if_missing": true,
+        "table": "x_feed_posts",
+        "column": "post_text"
+      }
+    },
+    {
+      "key": "save_time",
+      "type": "save",
+      "x": 40,
+      "y": 2100,
+      "name": "Save posted time",
+      "fill": {
+        "selector": "(//article[@data-testid=\"tweet\"])[{loop_index}]//time",
+        "save_as": "Custom attribute",
+        "attribute": "datetime",
+        "table": "x_feed_posts",
+        "column": "posted_at",
+        "skip_if_missing": true
+      }
+    },
+    {
+      "key": "after_inner",
+      "type": "continue_after_repeat",
+      "x": 430,
+      "y": 1340,
+      "name": "After tweet loop"
+    },
+    {
+      "key": "pagedown",
+      "type": "keyboard",
+      "x": 430,
+      "y": 1560,
+      "name": "Page down to load more",
+      "fill": {
+        "key": "PageDown"
+      }
+    },
+    {
+      "key": "wait_new",
+      "type": "sleep",
+      "x": 430,
+      "y": 1740,
+      "name": "Wait for new tweets",
+      "fill": {
+        "min": 2,
+        "max": 2,
+        "live": "min 1 / max 1 (not empty). Do not silently change the live bot."
+      }
+    },
+    {
+      "key": "catch",
+      "type": "catch",
+      "x": 700,
+      "y": 1240,
+      "name": "On scrape error"
+    },
+    {
+      "key": "log_err",
+      "type": "log",
+      "x": 700,
+      "y": 1460,
+      "name": "Log scrape error"
+    },
+    {
+      "key": "after_try",
+      "type": "after_try",
+      "x": 320,
+      "y": 2300,
+      "name": "After scrape"
+    },
+    {
+      "key": "dedupe",
+      "type": "remove_duplicate_rows",
+      "x": 320,
+      "y": 2480,
+      "name": "Keep unique posts",
+      "fill": {
+        "table": "x_feed_posts",
+        "column": "post_url",
+        "preserve_newest": false
+      }
+    },
+    {
+      "key": "log_ok",
+      "type": "log",
+      "x": 320,
+      "y": 2660,
+      "name": "Log scrape done"
+    },
+    {
+      "key": "note_login",
+      "type": "sticky_note",
+      "x": 720,
+      "y": 280,
+      "name": "note_login",
+      "text": "Agent Chrome must be signed into X. Creator tab login does not count."
+    },
+    {
+      "key": "note_harvest",
+      "type": "sticky_note",
+      "x": 1000,
+      "y": 800,
+      "name": "note_harvest",
+      "text": "Write JS harvest-while-scroll: X remounts tweet cards. Dedup column is post_id."
+    },
+    {
+      "key": "note_stop",
+      "type": "sticky_note",
+      "x": 1000,
+      "y": 1020,
+      "name": "note_stop",
+      "text": "Stop after 3 empty scroll rounds or 40 unique posts."
+    },
+    {
+      "key": "note_scroll",
+      "type": "sticky_note",
+      "x": 430,
+      "y": 1080,
+      "name": "note_scroll",
+      "text": "Outer N = scroll rounds, not tweet count."
+    }
   ],
   "edges": [
-    ["delete", "launch"],
-    ["launch", "open"],
-    ["open", "delay"],
-    ["delay", "try"],
-    ["try", "outer"],
-    ["outer", "inner"],
-    ["inner", "save_url"],
-    ["save_url", "save_author"],
-    ["save_author", "save_text"],
-    ["save_text", "save_time"],
-    ["inner", "after_inner"],
-    ["after_inner", "pagedown"],
-    ["pagedown", "wait_new"],
-    ["try", "catch"],
-    ["catch", "log_err"],
-    ["try", "after_try"],
-    ["after_try", "dedupe"],
-    ["dedupe", "log_ok"]
+    [
+      "delete",
+      "launch"
+    ],
+    [
+      "launch",
+      "open"
+    ],
+    [
+      "open",
+      "delay"
+    ],
+    [
+      "delay",
+      "harvest"
+    ],
+    [
+      "harvest",
+      "try"
+    ],
+    [
+      "try",
+      "outer"
+    ],
+    [
+      "outer",
+      "inner"
+    ],
+    [
+      "inner",
+      "save_url"
+    ],
+    [
+      "save_url",
+      "save_author"
+    ],
+    [
+      "save_author",
+      "save_text"
+    ],
+    [
+      "save_text",
+      "save_time"
+    ],
+    [
+      "inner",
+      "after_inner"
+    ],
+    [
+      "after_inner",
+      "pagedown"
+    ],
+    [
+      "pagedown",
+      "wait_new"
+    ],
+    [
+      "try",
+      "catch"
+    ],
+    [
+      "catch",
+      "log_err"
+    ],
+    [
+      "try",
+      "after_try"
+    ],
+    [
+      "after_try",
+      "dedupe"
+    ],
+    [
+      "dedupe",
+      "log_ok"
+    ]
   ]
 }
