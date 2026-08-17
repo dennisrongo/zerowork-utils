@@ -150,6 +150,7 @@ write. Not "because it's a grid".
 - List scrape: **N identical-shape matches**, then `{loop_index}` to walk them.
 - Prefer stable attributes (`data-*`, `aria-label`, `type`, role) over hashed
   CSS modules. Prefer loose `*=` over exact class soup.
+- Selector length cap: **50,000** characters (1.1.62).
 
 ### Find a selector (live page)
 
@@ -363,6 +364,7 @@ Randomly pick one alternative. Useful against anti-spam uniqueness checks.
 
 Officially supported in **Update Data** (opt-in checkbox **Use spintax**,
 off by default) and **Insert Text or Data** (spintax checkbox in the drawer).
+Spintax expressions: **100 to 5,000** (1.1.61).
 
 ## Variables vs tables
 
@@ -396,8 +398,10 @@ Worked official example: cap outbound DMs at 30 per run → variable
 
 1. **Native table** — created in ZeroWork. REST:
    `POST /data_group/` `{name, type: 'NATIVE', columns: [{colName}…], connector_id}`.
-   Tables are **per-TaskBot**. There is no attach-existing-table route (405).
-   Always create fresh per bot.
+   Tables are **per-TaskBot**. REST has no attach-existing-table route
+   (**405**). The UI (1.1.75) can **Add an existing table** (searchable
+   long lists) — do **not** collapse this to "tables can never be reused".
+   REST create still needs a fresh table; never paste another bot's id.
 2. **Google Sheet** — paste a Sheet link, authenticate. Columns come from
    the Sheet; after adding columns in Sheets, click **Refresh / Refetch
    columns from Google Sheet**.
@@ -413,6 +417,7 @@ Worked official example: cap outbound DMs at 30 per run → variable
 |---|---|---|
 | Reliability | Streamlined with TaskBot runs | Subject to Google quota / outages |
 | Rename a column | All block refs **auto-remap** | Must remap (or refetch; deleted columns drop refs) |
+| Delete a column | Block refs removed. Write JS `setRef`/`getRef` stay but the `name` becomes **`INVALID`** | Must remap / refetch |
 | Share outside ZeroWork | Export CSV | Share the Sheet |
 | UI | 50 rows/page | Full Sheets UI |
 | Max cells | 1,500,000 | 10,000,000 |
@@ -420,7 +425,9 @@ Worked official example: cap outbound DMs at 30 per run → variable
 | Duplicate TaskBot | New table id | New table id, **same Sheet URL** |
 
 Sheets writes are batched (default every 50 rows; adjustable on Start Repeat
-additional options). Parallel TaskBots on Sheets are the usual quota-killer.
+Additional options). **Real-time sync** is a Start Repeat Additional option
+(1.1.69) for non-native / Google Sheets loops. Parallel TaskBots on Sheets
+are the usual quota-killer.
 Deleted / de-authed Sheet → run refuses to start.
 A **Sheets-backed table can exist without a Sheets *block*** — Sheets is a
 **table property**, not a building block (Pattern 18). Sidebar → Tables:

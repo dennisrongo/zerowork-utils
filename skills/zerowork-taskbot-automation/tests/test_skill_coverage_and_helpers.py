@@ -127,8 +127,9 @@ class TestWriteJsAuthoringAndRenameDocs(unittest.TestCase):
         self.assertIn("exposeFunction", wjs)
         self.assertIn("require is not defined", wjs)
         self.assertIn("getTaskbotInfo", wjs)
-        # Official docs use 4-digit examples. Live workspace ids are longer.
-        self.assertNotRegex(wjs, r"ref_id:\s*\d{5,}")
+        # Named constants only — no official-docs numeric ref_id examples.
+        self.assertNotIn("ref_id: 3623", wjs)
+        self.assertNotRegex(wjs, r"ref_id:\s*\d+")
 
         self.assertIn("### Rename nodes", editor)
         self.assertIn("There is **no REST node rename**", editor)
@@ -321,9 +322,11 @@ class TestSelfContainedScripts(unittest.TestCase):
         lijs = (TEMPLATES / "linkedin_feed_harvest.js").read_text(encoding="utf-8")
         for src in (xjs, lijs):
             self.assertIn("getTaskbotInfo", src)
-            self.assertIn("var TABLE = 0", src)
+            self.assertIn("const tableRefId", src)
+            self.assertIn("const varRefId", src)
             self.assertIn("appendIndex", src)
-            self.assertNotRegex(src, r"\bTABLE\s*=\s*[1-9]\d*")
+            self.assertNotIn("var TABLE = 0", src)
+            self.assertNotRegex(src, r"\btableRefId\s*=\s*[1-9]\d*")
         self.assertIn('article[data-testid="tweet"]', xjs)
         self.assertIn("primaryColumn", xjs)
         self.assertIn("scroll round", xjs)
@@ -1207,10 +1210,10 @@ class TestCssFirstSelectorsAndPattern9(unittest.TestCase):
             "catalog": (refs / "block-catalog.md").read_text(encoding="utf-8"),
         }
 
-    def test_version_is_1_3_17(self):
+    def test_version_is_1_3_18(self):
         skill = (SKILL_ROOT / "SKILL.md").read_text(encoding="utf-8")
-        self.assertIn("version: 1.3.17", skill)
-        self.assertNotIn("version: 1.3.16", skill)
+        self.assertIn("version: 1.3.19", skill)
+        self.assertNotIn("version: 1.3.18", skill)
 
     def test_css_first_rule_and_nth_filter(self):
         docs = self._docs()
@@ -1326,10 +1329,10 @@ class TestClientPatterns10And11(unittest.TestCase):
             "run": (refs / "run-and-platform.md").read_text(encoding="utf-8"),
         }
 
-    def test_version_is_1_3_17(self):
+    def test_version_is_1_3_18(self):
         skill = self._docs()["skill"]
-        self.assertIn("version: 1.3.17", skill)
-        self.assertNotIn("version: 1.3.16", skill)
+        self.assertIn("version: 1.3.19", skill)
+        self.assertNotIn("version: 1.3.18", skill)
 
     def test_pattern10_scheduled_dynamic_scrape(self):
         docs = self._docs()
@@ -1434,10 +1437,10 @@ class TestClientPatterns13To16(unittest.TestCase):
             "wjs": (refs / "write-javascript.md").read_text(encoding="utf-8"),
         }
 
-    def test_version_is_1_3_17(self):
+    def test_version_is_1_3_18(self):
         skill = self._docs()["skill"]
-        self.assertIn("version: 1.3.17", skill)
-        self.assertNotIn("version: 1.3.16", skill)
+        self.assertIn("version: 1.3.19", skill)
+        self.assertNotIn("version: 1.3.18", skill)
 
     def test_pattern13_linkedin_outreach_dm(self):
         docs = self._docs()
@@ -1568,10 +1571,10 @@ class TestClientPatterns17To19(unittest.TestCase):
             "wjs": (refs / "write-javascript.md").read_text(encoding="utf-8"),
         }
 
-    def test_version_is_1_3_17(self):
+    def test_version_is_1_3_18(self):
         skill = self._docs()["skill"]
-        self.assertIn("version: 1.3.17", skill)
-        self.assertNotIn("version: 1.3.16", skill)
+        self.assertIn("version: 1.3.19", skill)
+        self.assertNotIn("version: 1.3.18", skill)
 
     def test_pattern17_two_phase_no_run_taskbot(self):
         docs = self._docs()
@@ -1682,6 +1685,164 @@ class TestClientPatterns17To19(unittest.TestCase):
                     "%s must not contain live id/url/token %s" % (name, token),
                 )
             self.assertNotRegex(blob, r"\{id:\s*\d{5,}")
+
+
+
+
+class TestDocsSweep1318(unittest.TestCase):
+    """1.3.18 official-docs sweep. High-signal facts only. No live client IDs."""
+
+    FORBIDDEN = (
+        "61072",
+        "60018",
+        "49000",
+        "56935",
+        "51184",
+        "58586",
+        "58439",
+        "59008",
+        "57800",
+        "57424",
+        "31875",
+        "56878",
+        "55290",
+        "21214",
+        "n8n.gohighroad",
+        "leancodeautomation",
+        "docs.google.com/spreadsheet",
+        "activepieces",
+    )
+
+    def _docs(self):
+        refs = SKILL_ROOT / "references"
+        return {
+            "skill": (SKILL_ROOT / "SKILL.md").read_text(encoding="utf-8"),
+            "catalog": (refs / "block-catalog.md").read_text(encoding="utf-8"),
+            "run": (refs / "run-and-platform.md").read_text(encoding="utf-8"),
+            "wjs": (refs / "write-javascript.md").read_text(encoding="utf-8"),
+            "prim": (refs / "platform-primitives.md").read_text(encoding="utf-8"),
+            "rest": (refs / "rest-api.md").read_text(encoding="utf-8"),
+        }
+
+    def test_version_is_1_3_18(self):
+        skill = self._docs()["skill"]
+        self.assertIn("version: 1.3.19", skill)
+        self.assertNotIn("version: 1.3.18", skill)
+
+    def test_exclusive_after_date(self):
+        catalog = self._docs()["catalog"]
+        self.assertIn("exclusive of the shifted day", catalog)
+        self.assertIn("14+", catalog)
+        self.assertIn("not 13+", catalog)
+        self.assertIn("12-", catalog)
+
+    def test_contains_is_official_comma_separated_keywords(self):
+        catalog = self._docs()["catalog"]
+        self.assertIn("comma-separated **keywords**", catalog)
+        self.assertIn("not a live-only extra", catalog)
+
+    def test_per_block_delay_is_after(self):
+        catalog = self._docs()["catalog"]
+        self.assertIn("**AFTER** the action", catalog)
+        self.assertIn("preceding", catalog.lower())
+        self.assertIn("abandoned as soon as the element is found", catalog)
+        self.assertIn("30–60s", catalog)
+
+    def test_get_agent_info_async_in_browser(self):
+        wjs = self._docs()["wjs"]
+        self.assertIn("async in browser", wjs)
+        self.assertIn("metadata.md", wjs)
+        self.assertIn("stale", wjs.lower())
+        self.assertIn("await zw.getAgentInfo()", wjs)
+
+    def test_upload_390mb_unique_names_and_viewport(self):
+        docs = self._docs()
+        self.assertIn("390 MB", docs["catalog"])
+        self.assertIn("unique", docs["skill"].lower())
+        self.assertIn("1.1.61", docs["skill"])
+        self.assertIn("unique", docs["rest"].lower())
+        self.assertIn("1440", docs["wjs"])
+        self.assertIn("900", docs["wjs"])
+        self.assertIn("1440\u00d7900", docs["run"])
+
+    def test_live_trigger_url_still_documented(self):
+        docs = self._docs()
+        for blob in (docs["skill"], docs["run"]):
+            self.assertIn("https://webhook.zerowork.io/trigger/<token>", blob)
+        self.assertIn("s=<TASKBOT_KEY>&agent=<AGENT_ID>", docs["run"])
+        self.assertIn("POST or GET", docs["run"])
+
+    def test_no_live_client_ids(self):
+        docs = self._docs()
+        for name, blob in docs.items():
+            for token in self.FORBIDDEN:
+                self.assertNotIn(
+                    token,
+                    blob,
+                    "%s must not contain live id/token %s" % (name, token),
+                )
+            self.assertNotRegex(blob, r"\{id:\s*\d{5,}")
+
+class TestWriteJsConstants1319(unittest.TestCase):
+    """1.3.19 Write JS constants-at-the-top. No live client IDs."""
+
+    FORBIDDEN = (
+        "92164",
+        "117386",
+        "110832",
+        "106495",
+        "114268",
+        "115157",
+    )
+
+    def _docs(self):
+        refs = SKILL_ROOT / "references"
+        return {
+            "skill": (SKILL_ROOT / "SKILL.md").read_text(encoding="utf-8"),
+            "wjs": (refs / "write-javascript.md").read_text(encoding="utf-8"),
+            "xjs": (TEMPLATES / "x_feed_harvest.js").read_text(encoding="utf-8"),
+            "lijs": (TEMPLATES / "linkedin_feed_harvest.js").read_text(encoding="utf-8"),
+        }
+
+    def test_version_is_1_3_19(self):
+        skill = self._docs()["skill"]
+        self.assertIn("version: 1.3.19", skill)
+        self.assertNotIn("version: 1.3.18", skill)
+
+    def test_constants_at_the_top_convention(self):
+        docs = self._docs()
+        wjs = docs["wjs"]
+        skill = docs["skill"]
+        self.assertIn("constants at the top", wjs.lower())
+        self.assertIn("tableRefId", wjs)
+        self.assertIn("varRefId", wjs)
+        self.assertIn("indexRefId", wjs)
+        self.assertIn("tableRefId", skill)
+        self.assertIn("varRefId", skill)
+        self.assertNotIn("ref_id: 3623", wjs)
+        self.assertNotIn("ref_id: 3624", wjs)
+        self.assertNotRegex(wjs, r"ref_id:\s*\d+")
+
+    def test_harvest_templates_hoist_ref_constants(self):
+        docs = self._docs()
+        for src in (docs["xjs"], docs["lijs"]):
+            self.assertIn("getTaskbotInfo", src)
+            self.assertIn("const tableRefId", src)
+            self.assertIn("const varRefId", src)
+            self.assertNotIn("var TABLE = 0", src)
+            self.assertNotRegex(src, r"\btableRefId\s*=\s*[1-9]\d*")
+            self.assertIn("ref_id: tableRefId", src)
+
+    def test_no_live_client_ids(self):
+        docs = self._docs()
+        for name, blob in docs.items():
+            for token in self.FORBIDDEN:
+                self.assertNotIn(
+                    token,
+                    blob,
+                    "%s must not contain live id %s" % (name, token),
+                )
+
 
 
 if __name__ == "__main__":

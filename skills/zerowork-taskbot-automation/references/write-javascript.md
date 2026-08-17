@@ -46,8 +46,9 @@ Old unprefixed `log()`, `delay()`, `setRef()`, `getRef()`, `activePage`,
 `zw.browserContext.getActivePage()` / `getContext()`.
 Client scrapers (Pattern 15) use `setRef({..., appendIndex: i})` to append N rows
 in one node, persist an `index` cursor across scroll passes, plus `await log({message})`
-and `await delay({min,max})` (official unit ms). Resolve `ref_id` via
-`zw.getTaskbotInfo()` / **My references**, never another bot's table id.
+and `await delay({min,max})` (official unit ms). Put `tableRefId` /
+`varRefId` at the top (from **My references**, or `zw.getTaskbotInfo()`
+in portable templates). Never another bot's table id.
 
 `zw` also works in no-code inputs: `${…}` expressions and `$${…}` blocks
 (must `return`). See [platform-primitives.md](platform-primitives.md).
@@ -64,16 +65,22 @@ waits for that delay (1.1.68) so fire-and-forget async can finish.
 
 ## Variables and tables
 
+Put `tableRefId` / `varRefId` (and any extra `*RefId`) at the top of
+the script — see [Authoring: constants at the top](#authoring-constants-at-the-top).
+Never a raw number inline.
+
 ```js
-const email = await zw.getRef({ ref_id: 3623, name: "Email" });
-await zw.setRef({ ref_id: 3624, name: "Email copy", value: email });
-await zw.setRef({ ref_id: dgId, name: "title", value: String(text), appendIndex: i });
+const email = await zw.getRef({ ref_id: varRefId, name: "Email" });
+await zw.setRef({ ref_id: varRefId, name: "Email copy", value: email });
+await zw.setRef({ ref_id: tableRefId, name: "title", value: String(text), appendIndex: i });
 ```
 
 - `ref_id` = data-group id (Variables table or an attached table). `name`
   is case-sensitive.
 - `value` **must be a string**. `JSON.stringify` on write, `JSON.parse` on
   read. A missing name errors the run.
+- Deleted native column: `setRef`/`getRef` stay, but the deleted column
+  `name` in the arguments is automatically changed to **`INVALID`**.
 - `appendIndex` is 0-based among **appended** rows and works **without** a
   loop (verified 20/20). Do **not** mix `appendIndex` with being inside a
   Start Repeat — the built-in loop index and custom append disagree.
@@ -131,7 +138,8 @@ Persistent report message ~500 chars; live view ~500,000. Truncated, no throw.
 ## Metadata
 
 ```js
-zw.getAgentInfo(); // { version, type: "API_KEY"|"DEFAULT"|"GUEST", id|null }
+await zw.getAgentInfo(); // browser: async (1.1.75 breaking). Local: still sync.
+// { version, type: "API_KEY"|"DEFAULT"|"GUEST", id|null }
 await zw.getTaskbotInfo();
 // { id, name, runType: "immediate"|"scheduled"|"webhook",
 //   currentRunResult, variables: {ref_id, variableNames},
@@ -140,6 +148,11 @@ await zw.getTaskbotInfo();
 ```
 
 Names only — use `getRef` for values.
+
+**1.1.75:** `zw.getAgentInfo()` is **async in browser** (was sync
+everywhere). Official `metadata.md` is **stale** — it still says
+"`zw.getAgentInfo()` is sync everywhere" and shows a sync call.
+Prefer the 1.1.75 release note. Always `await` it in browser code.
 
 ## Imports / packages (local)
 
@@ -153,10 +166,16 @@ await zw.packages.uninstallAll();
 ```
 
 - `// @zw-disable-auto-import` to require explicit `zw.import`.
+- `zw.import(pkg, options?)` overloads: `pkg` is a **string**,
+  **string[]**, or `{ alias: spec }` object. Options:
+  `uninstallIfUnusedFor` (hours; default **168**; `null` = never),
+  `isolate?`, `preferDefault?`. Package IDs are opaque
+  (`12345_dayjs@1.1.0`, `repo@git`).
 - Unused packages auto-removed after 1 week unless `uninstallIfUnusedFor: null`.
 - `isolate: true` scopes the package to this TaskBot.
 - Allowed: `"lodash"`, `"lodash@4.17.21"`, `"lodash/chunk"`, HTTPS git URLs.
   Rejected: tarballs, local paths, non-HTTPS git.
+- Native / C++ packages may not work reliably (need matching Node, build tools, system libs).
 - Built-ins (not listed, not uninstallable): Node core, `axios@^1.6.6`,
   `playwright@^1.45.0`.
 - Pure ESM packages are **not** supported (use a CJS fork or pin, e.g. `chalk@4`).
@@ -181,8 +200,8 @@ await zw.browserContext.launch({
     cookies: [/* {name,value,domain} */],
     scripts: [{ content: "/* before any page */" }],
     launchOptions: { headless: true, proxy: { server: "host:port" } },
-    contextOptions: { viewport: { width: 1280, height: 720 } },
-    onContextReady: async (ctx) => { /* every launch AND sticky attach */ },
+    contextOptions: { viewport: { width: 1440, height: 900 } }, // official default
+    onContextReady: async (ctx) => { /* every launch AND every sticky attach — gate it */ },
   },
   runConfig: { keepAlive: false, bringToFront: true },
   policy: { makeMain: true, inheritDefaults: true, setAsDefaults: true },
@@ -193,17 +212,71 @@ await zw.browserContext.quit(); // { forceQuit: true } kills shared sticky
 ```
 
 Other methods: `getContext()`, `getContextInfo()`, `getDefaults()`,
-`setDefaults()`, `resetDefaults()`, `createPage({url})`, `listPages()`,
+`setDefaults()`, `resetDefaults()`, `createPage({url})`, `listPages()`
+(returns `page`, `url`, `isActive`, `contextId`, **`usedBy`** taskbotId),
 `isActivePage(page)`, `adoptContext(ctx)`,
-`clearProfile` / `cloneProfile` / `listProfiles`.
+`clearProfile` / `cloneProfile({ cloneFrom: { profilePath } })` /
+`listProfiles`. `cloneFrom.profilePath` is the browser Profile Path
+from `chrome://version`.
 
 Closing the last tab (Switch or Close Tab) **ends the context**. The next
 Open Link launches fresh from **current defaults**.
 
 Bypass detection: uploads ≳ 50 MB blocked; some launch/context options
-ignored. SOCKS5 auth is not supported. Do not combine headless + keepAlive.
+ignored. `recordVideo` is available **only** when `bypassDetection` is
+false. SOCKS5 auth is not supported. Do not combine headless + keepAlive.
 Sticky: one live browser per profile id; attach ignores browser-level
-launch options.
+launch options. `onContextReady` runs on **every** sticky attach — gate
+it. Cookies may be a single list **or a list of lists** (multi-site).
+`contextProvider` (Firefox example is on the official page): you supply
+the context; `launchOptions` / `contextOptions` / `maximize` /
+`bypassDetection` are ignored; **sticky mode throws**.
+Official launch viewport default is **1440×900** (1280×720 is the
+background-run Window-size fallback, not this default).
+
+## Authoring: constants at the top
+
+Every Write JS script starts with named constants. Never put a raw
+number inline in `getRef` / `setRef`.
+
+```js
+// Reference: https://docs.zerowork.io/using-zerowork/using-building-blocks/write-javascript
+const tableRefId = <THIS_BOT_TABLE_ID>;
+const varRefId = <THIS_BOT_VARIABLES_ID>;   // when Variables are used
+const indexRefId = <THIS_BOT_INDEX_VAR_TABLE>; // when a cursor is persisted
+const domain = 'https://www.example.com';   // other constants
+```
+
+Then all `getRef` / `setRef` use those constants:
+
+```js
+const email = await zw.getRef({ ref_id: varRefId, name: "Email" });
+await zw.setRef({ ref_id: varRefId, name: "Email copy", value: email });
+await zw.setRef({ ref_id: tableRefId, name: "title", value: String(text), appendIndex: i });
+```
+
+Naming (camelCase, `*RefId` suffix for ZeroWork numeric ids):
+
+- `tableRefId` — primary attached table
+- `varRefId` — Variables table (also seen as `varRefid` once; standardize on `varRefId`)
+- `indexRefId` — table that holds the `index` cursor
+- `postsRefId` / `usersTableRefId` / `resultRefId` — extra tables, noun + `RefId` or `TableRefId`
+- Other constants (`domain`, selectors-as-strings) also at the top
+
+On client bots, add a sticky note: **"Change the variable tableRefId in the JS code to your own."**
+
+Portable templates (`x_feed_harvest.js` and friends) still resolve via
+`zw.getTaskbotInfo()` so they are not bound to one bot — but they MUST
+assign the result to the same top-of-file constants:
+
+```js
+const info = await zw.getTaskbotInfo();
+const tableRefId = /* the attached table id from info, not another bot */;
+const varRefId = /* Variables table id from info */;
+```
+
+Do not paste another bot's table id. Do not copy official-docs numeric
+`ref_id` examples into a script — those ids are not this bot's.
 
 ## Authoring for a human in the Write JS drawer
 
@@ -286,7 +359,7 @@ pragma. That path is a last resort in
 file if you must type.
 
 Pasteable harvest scripts (no account table ids — they call
-`zw.getTaskbotInfo()` or take `TABLE` from **My references**):
+`zw.getTaskbotInfo()` and assign `tableRefId` / `varRefId` at the top):
 [../templates/x_feed_harvest.js](../templates/x_feed_harvest.js),
 [../templates/linkedin_feed_harvest.js](../templates/linkedin_feed_harvest.js).
 
@@ -308,8 +381,9 @@ https://docs.zerowork.io/using-zerowork/using-building-blocks/write-javascript/m
   `setRef`/`appendIndex` in one block (Pattern 3).
 - HTTP + transform + notify → Send HTTP / math / ChatGPT / Log (no JS).
 - Need Playwright routes, npm, or device secrets → Write JS, run locally.
-- Do **not** hard-code tableRefId or a test URL in Write JS. Resolve
-  ref_id via zw.getTaskbotInfo() / **My references**, and use the
-  URL you just saved (getRef), not a leftover debug string.
+- Do **not** bake another bot's table id or a leftover test URL into
+  Write JS. Put `tableRefId` / `varRefId` at the top (from **My
+  references**, or `zw.getTaskbotInfo()` in portable templates) and
+  use the URL you just saved (`getRef`), not a leftover debug string.
 - Values interpolated into a hand-written JSON HTTP body: strip double quotes
   so the JSON stays valid (Pattern 19).

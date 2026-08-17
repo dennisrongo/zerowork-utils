@@ -1,7 +1,29 @@
 /* LinkedIn home-feed scrape.
    Paste into Write JS. Browser execution (do NOT tick Run locally).
-   Table id: leave TABLE = 0 to resolve via zw.getTaskbotInfo(), or paste
-   the ref_id from the drawer's My references. Never copy another bot's id. */
+   tableRefId / varRefId resolve via zw.getTaskbotInfo() so this is not
+   bound to one bot. Change tableRefId to your own if My references
+   already shows it. */
+// Reference: https://docs.zerowork.io/using-zerowork/using-building-blocks/write-javascript
+const info = await zw.getTaskbotInfo();
+const varRefId = (info && info.variables && info.variables.ref_id) ? info.variables.ref_id : 0;
+const TABLE_NAME = "linkedin_feed_posts";
+var _tables = (info && info.tables) ? info.tables : [];
+var _t;
+for (var _ti = 0; _ti < _tables.length; _ti++) {
+  if (_tables[_ti].name === TABLE_NAME) { _t = _tables[_ti]; break; }
+}
+if (!_t) {
+  for (var _tj = 0; _tj < _tables.length; _tj++) {
+    if (_tables[_tj].type === "ZW_NATIVE" && _tables[_tj].name !== "Variables") {
+      _t = _tables[_tj];
+      break;
+    }
+  }
+}
+if (!_t || !_t.ref_id) {
+  throw new Error("No native table on this TaskBot — create one, or set tableRefId from My references");
+}
+const tableRefId = _t.ref_id;
 function txt(el, sels) {
   if (!el) return "";
   for (var i = 0; i < sels.length; i++) {
@@ -38,29 +60,6 @@ if (/\/login|\/uas\/login|\/checkpoint/i.test(location.href) ||
     tag: "linkedin"
   });
   throw new Error("LinkedIn session missing");
-}
-
-var TABLE_NAME = "linkedin_feed_posts";
-var TABLE = 0;
-if (!TABLE) {
-  var info = await zw.getTaskbotInfo();
-  var tables = (info && info.tables) ? info.tables : [];
-  var t;
-  for (var ti = 0; ti < tables.length; ti++) {
-    if (tables[ti].name === TABLE_NAME) { t = tables[ti]; break; }
-  }
-  if (!t) {
-    for (var tj = 0; tj < tables.length; tj++) {
-      if (tables[tj].type === "ZW_NATIVE" && tables[tj].name !== "Variables") {
-        t = tables[tj];
-        break;
-      }
-    }
-  }
-  if (!t || !t.ref_id) {
-    throw new Error("No native table on this TaskBot — create one, or set TABLE from My references");
-  }
-  TABLE = t.ref_id;
 }
 
 clickSeeMore();
@@ -158,7 +157,7 @@ for (var i = 0; i < posts.length; i++) {
   var names = Object.keys(p);
   for (var k = 0; k < names.length; k++) {
     await zw.setRef({
-      ref_id: TABLE,
+      ref_id: tableRefId,
       name: names[k],
       value: String(p[names[k]] == null ? "" : p[names[k]]),
       appendIndex: i

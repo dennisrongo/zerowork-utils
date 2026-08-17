@@ -31,12 +31,15 @@ Assemble a spec: [../scripts/zw_assemble.py](../scripts/zw_assemble.py).
 ## Workflow assembly (REST-first — minutes, not canvas hours)
 
 1. Create bot: `POST /connector/` `{name}` → `{id, name, variables_id}` (200).
+   Names must be **unique** (1.1.61) — a colliding create fails.
    (The `/workflows` "New TaskBot" button does the same.) `POST /auth/token/refresh/`
    `{refresh}` returns a new `access` JWT when the stored access token is expired.
 2. `POST /node/` × N (grid positions), `POST /edge/` × chain.
 3. `POST /data_group/` `{name, type: 'NATIVE', columns: [{colName}...], connector_id}` — creates
-   AND attaches a table with columns in one call. Tables are per-bot instances; there is NO route
-   to attach an existing table to another bot (405) — always create fresh per bot.
+   AND attaches a table with columns in one call. Tables are per-bot instances; REST has NO route
+   to attach an existing table to another bot (405) — always create fresh per bot via REST.
+   The UI (1.1.75) can **Add an existing table** — do not tell a weaker model
+   tables can never be reused.
 4. Reload the editor → configure drawers (paired-Chrome cua-driver, or
    page-JS setters — [creator-editor-automation.md](creator-editor-automation.md))
    → "Detect errors" → Run. Rename the **TaskBot**:

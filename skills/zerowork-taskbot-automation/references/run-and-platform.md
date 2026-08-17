@@ -14,13 +14,26 @@ Official: https://docs.zerowork.io/install-the-agent.md
 - Windows install: `%LOCALAPPDATA%\Programs\ZeroWork\ZeroWork.exe` (Electron
   tray app). Health: `curl http://localhost:9990` →
   `{"message":"ZeroWork Agent running","version":…,"port":9990}`.
+  **1.1.75:** if 9990 is taken the Agent falls back to another port —
+  read `port` from the JSON.
 - If down: launch ZeroWork.exe, wait 10–12s, re-curl.
-- Linux: `.deb` / `.AppImage` / `.rpm` (download is login-gated). VPS installs
-  are officially supported.
+- **Chrome must be installed** even if you build/start from another
+  browser. Brave **Shields** (and similar blockers) can block Run
+  because the creator talks to the local Agent. VPN / firewall /
+  antivirus can also block start.
+- Linux: `.deb` / `.AppImage` / `.rpm` (download is login-gated). VPS
+  installs are officially supported. **openSUSE is unsupported.**
+  AppImage → install AppImageLauncher. If no tray icon after 30s but
+  localhost answers, install the GNOME **appindicator** extension.
+  Prove install with Open Link to wikipedia.
 - The agent drives **real Chrome**. The window closes after a run unless
   **Stay on page after run** is on (or a Launch Browser block set it).
-- **Guest Agent** (not logged in) can only do **manual** Run clicks. Scheduler,
-  webhook, and Concurrent Runs require a **linked** (logged-in) agent.
+- Agent model (1.1.75): **Guest** (not logged in — manual Run only; no
+  schedule/webhook; blocks same-bot concurrency) / **Default** (exactly
+  one per account; schedule/webhook/concurrency; listed and
+  **pauseable** at creator.zerowork.io/agents) / **Additional**
+  (purchased + API-key link; same schedule/webhook/concurrency).
+  Pause-from-browser rejects all runs until unpaused.
 
 ### Two Chromes (do not confuse them)
 
@@ -87,7 +100,10 @@ Gear icon on the TaskBot. Launch Browser blocks can override these mid-run
 ### Run in background
 
 Hides the Chrome window. Use it only after the bot is reliable. Background
-viewport defaults to **1280×720** unless Window size is set. Do **not**
+viewport falls back to **1280×720** when Window size is unset (Launch
+Browser page). Official Write-JS / launch `contextOptions.viewport`
+default is **1440×900** — do not treat 1280×720 as the documented
+platform default. Do **not**
 combine with Stay-on-page — leaves an invisible browser eating RAM; sticky
 profiles can drop after machine sleep until the agent is restarted.
 
@@ -95,6 +111,9 @@ profiles can drop after machine sleep until the agent is restarted.
 
 Keeps Chrome open for manual inspection. Off by default (saves resources).
 An explicit **Quit Browser** overrides this and closes anyway.
+**1.1.61:** Stay-on-page now applies to **scheduled and webhook** runs
+too (previously ignored). An unintentionally enabled setting leaves an
+invisible idle Chrome after those fires.
 
 ### Bring pages to front
 
@@ -176,8 +195,14 @@ in only on the dedicated box. Linked agent + machine awake.
 
 ## Webhooks
 
-Header **Webhook** icon → Webhook modal. Official docs mention POST or
-GET; the live modal has **no method picker** (inbound **POST**).
+Header **Webhook** icon → Webhook modal.
+
+**Official** (trigger-run-via-webhook.md): the webhook can be triggered
+with a **POST or GET**. Query parameters are supported on both (same
+case-sensitive variable / JSONPath rules as the body).
+
+**Live UI** (keep — official page does not show this URL): **no method
+picker** (inbound **POST**).
 
 Live UI shape:
 
@@ -186,6 +211,11 @@ Live UI shape:
 - One URL: `https://webhook.zerowork.io/trigger/<token>`
 - Copy icon. Red delete icon = **rotate** (new token).
 - No method picker.
+
+**Multi-agent targeting (1.1.74):**
+`https://webhook.zerowork.io/s=<TASKBOT_KEY>&agent=<AGENT_ID>`
+(Agent ID from the Agents list). Scheduler **cannot** target an Agent
+yet — webhook only. Keep documenting the live `trigger/<token>` URL.
 
 - Full body is stored (stringified JSON) in auto-variable **`zw_webhook_data`**.
   Parse with `JSON.parse` in Write JS.
@@ -199,15 +229,24 @@ Live UI shape:
 
 ## Sharing
 
-TaskBot sharing options (official page) control who can view/run a bot.
-Duplicating a bot duplicates its **table id** but a Google Sheet URL is
-**shared** (both bots write the same Sheet) until you Edit link.
+Sharing is a **full copy**, not a view/run ACL. Two official options:
+share to an email, or generate a live link. A full copy of the TaskBot
+(parameters, variables, tables) is added to the receiver's account.
+Native rows are **empty**; variables are **empty**. Google Sheet tables
+still contain **your Sheet URL**. Cookies / proxy / scheduler / other
+run settings are **never** shared. The link always reflects the current
+bot; reset rotates it.
+
+Duplicating a bot in the same account also duplicates its **table id**
+but a Google Sheet URL is **shared** (both bots write the same Sheet)
+until you Edit link.
 
 ## Remote / cloud execution
 
-Official page exists; as of the 2026-08-16 fetch it is a short stub. Do not
-assume a public cloud runner. The verified path is still: local/VPS desktop
-agent + UI / schedule / webhook.
+Official page exists; as of the 2026-08-17 fetch it is still a short
+**Upcoming** stub (pay-per-cloud-credit teaser). Do not assume a public
+cloud runner. The verified path is still: local/VPS desktop agent + UI /
+schedule / webhook.
 
 ## Run reports and notifications
 
@@ -218,7 +257,9 @@ Official: https://docs.zerowork.io/using-zerowork/using-run-reports.md
 - Write JS `console.log` is **not** persisted in reports. Persist via
   `zw.log` / Log block / table write / Send Notification.
 - Notifications (email, Slack incoming webhook, custom POST webhook) always
-  include error reports. Custom payload fields:
+  include error reports. Run-notification emails: **max 10** addresses
+  (1.1.61). Error-report screenshots retained **14 days** (1.1.61).
+  Custom payload fields:
   `run_status` (`success|fail|warning|unknown|manually_stopped`),
   `run_type` (`webhook|scheduled|immediate`), `run_errors[]` with
   `error_message`, `screenshot`, `building_block.{id,name,type}`.
@@ -232,11 +273,11 @@ Official hub: https://docs.zerowork.io/using-zerowork/common-problems.md
 |---|---|
 | TaskBot does not start | Agent down/outdated; more than one starting block; Detect-errors failures; invalid Sheet; Guest Agent + schedule/webhook |
 | Table ref pulls no data | You used a Standard loop (ignores existing rows) or the ref is outside a Dynamic loop / not on the current row. Open Link "no url" is this. |
-| Website flashing / glitching | Often **Bring pages to front** + rapid nav, or a site fighting automation. Slow down (Delay), run in background, or Bypass bot detection. |
+| Website flashing / glitching | Official: the TaskBot cannot find a selector. Live-verified extra: **Bring pages to front** + rapid nav, or a site fighting automation. Fix the selector first; then slow down (Delay), run in background, or Bypass. |
 | No selector found | Selector not unique / increment missing `{loop_index}` / element in iframe (Switch Frame) / not yet in DOM (Check + timeout, or Delay). Prove with `querySelectorAll`. |
 | Saves some rows, not all | Last-page render race (add Delay after Click Next); list not scrolled (auto-scroll failed → Keyboard PageDown / space); skip-if-not-found swallowed misses. |
 | Data in wrong format | Sanitize with Format Data / Regex / Number Operations **Remove format** before numeric conditions. |
-| Site wants SMS / email verify | Cookies or sticky profile after a **manual** verify. Don't try to automate the SMS. |
+| Site wants SMS / email verify | Official path: **Check** for the verify popup → long **Delay** so a human can complete it in a **visible** Agent window (not Run in Background). If background: abort + Send Notification. After a manual verify, cookies or sticky persist the session. Do not automate the SMS. |
 | Keyboard action does nothing | Focus the field first (Click or Insert). Some sites eat keys; try Insert Text. See Keyboard Action. |
 | Check says Found, next block misses | Race: the element flickered or a overlay. Add Delay / wait, or re-Check immediately before the action. Check timeout ≠ later block timeout. |
 | Insert Text drops first letters | Site wasn't ready; Click the field first, or slow the typing speed, or add a short Delay. |
@@ -249,20 +290,38 @@ if you wrap the whole canvas.
 
 ## Release-note behavior that changes building (1.1.61–1.1.75)
 
-Scanned 2026-08-16. Only items that change how you pick or configure blocks:
+Scanned 2026-08-17. 1.1.61–1.1.74 are **not** "mostly reliability" —
+several lines change how you build:
 
-- **1.1.72** — Code in inputs (`${}` / `$${}`) ships. `zw.*` API surface
+- **1.1.61** — Unique TaskBot names (colliding create fails). Auto-scroll
+  default ON except Dynamic. Stay-on-page applies to scheduled/webhook.
+  Caps: selector later 50k (1.1.62); spintax 5k; log 5k/run; 10
+  notification emails; error screenshots 14 days.
+- **1.1.69** — HTTP full-object save; Sheets real-time sync Additional
+  option; Remove Duplicates can run every Sheets-loop iteration (native
+  still once).
+- **1.1.72** — Code in inputs (`${}` / `$${}`). Upload File **390 MB**
+  hard cap. Random **whole number** checkbox. `zw.*` API surface
   (imports, deviceStorage, state, browserContext) documented as current.
-- **1.1.75** — Run TaskBot block; Concurrent Runs; faster browser execution
-  + stronger bypass. Revert knobs: `@zw-revert` (old `zw.*` in **browser**
+- **1.1.74** — Multi-agent webhook `…/s=<TASKBOT_KEY>&agent=<AGENT_ID>`;
+  scheduler cannot target an Agent.
+- **1.1.75** — Run TaskBot block; Concurrent Runs; Guest / Default /
+  Additional Agent + pause-from-browser; Agent port fallback; Launch
+  Browser Custom profile field accepts refs; `zw.getAgentInfo()` **async
+  in browser** (official metadata.md is **stale** — still says sync
+  everywhere); default Insert Text typing slower (Robotic 0-delay or
+  Insert instantly). Revert knobs: `@zw-revert` (old `zw.*` in **browser**
   execution only), `zw.temp.disableExtraBypass()`,
   `zw.temp.disableExtraHeadlessBypass()`,
   `zw.temp.disableExtraTimezoneBypass()` (per run).
 - Launch Browser / Quit Browser / sticky profiles appear as first-class
   palette blocks (they are **not** listed on the building-blocks hub).
-- Scheduled-overlap semantics change if you enable Concurrent Runs (see
-  above).
+- Official **scheduler.md** FAQ "skip if already running" is **stale**
+  when Concurrent Runs is on (1.1.75) — do not copy it blindly.
+- Official stubs (prefer live drawer + this skill): Raise Error
+  (Upcoming), Auto-scroll page (Upcoming), Remote/cloud (Upcoming),
+  thin Check / Click / Go Back / Save Page URL / Abort / Take Screenshot
+  pages. Official metadata.md is stale vs 1.1.75 as noted above.
 
-Older notes (1.1.61–1.1.74) are mostly reliability, UI, and incremental
-`zw` additions; they do not remove any palette type. Prefer the live
-drawer + this skill over a guessed historical type string.
+They do not remove any palette type. Prefer the live drawer + this skill
+over a guessed historical type string.

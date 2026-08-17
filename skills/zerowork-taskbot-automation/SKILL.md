@@ -1,7 +1,7 @@
 ---
 name: zerowork-taskbot-automation
 description: "Use when building, running, or automating ZeroWork TaskBots."
-version: 1.3.17
+version: 1.3.19
 author: Dennis Rongo (@codingmenace)
 license: MIT
 metadata:
@@ -29,10 +29,12 @@ ZeroWork sessions found in a browser may belong to someone else's workspace, not
 
 ## Desktop Agent lifecycle
 - Installed at `%LOCALAPPDATA%\Programs\ZeroWork\ZeroWork.exe` (Electron tray app, no UI)
-- Health check: `curl -s http://localhost:9990` → `{"message":"ZeroWork Agent running","version":...,"port":9990}`
+- Health check: `curl -s http://localhost:9990` → `{"message":"ZeroWork Agent running","version":...,"port":9990}`. **1.1.75:** if 9990 is taken the Agent falls back to another port — read `port` from the JSON (do not hard-fail on 9990).
 - Start if down: launch ZeroWork.exe (background terminal), wait 10–12s, re-curl
+- **Chrome must be installed** even if you build/start from another browser — TaskBots run in automated Chrome. Brave **Shields** (and similar blockers) can block Run because the creator talks to the local Agent.
 - Runs TaskBots in real Chrome windows; window closes after run unless "Stay on page after run" is enabled
-- Linux agent exists (.deb/.AppImage/.rpm, download login-gated); VPS installs officially supported. See the Ubuntu install script in this repo's root.
+- Agent model (1.1.75): **Guest** (not logged in — manual Run only, no schedule/webhook, blocks same-bot concurrency) / **Default** (exactly one per account; schedule/webhook/concurrency; pauseable from creator.zerowork.io/agents) / **Additional** (purchased + API-key link). Pause-from-browser rejects all runs until unpaused.
+- Linux agent exists (.deb/.AppImage/.rpm, download login-gated); VPS installs officially supported. openSUSE is **unsupported**; AppImage → AppImageLauncher; if tray is missing after 30s but localhost answers, install the GNOME appindicator extension. See the Ubuntu install script in this repo's root.
 
 ## REST-first build path (PREFERRED over canvas drags)
 
@@ -46,7 +48,7 @@ Node Playground is the living coverage map (incomplete vs the 44; 25
 
 Key facts: edges via `POST /connector/<id>/edge/` (full object incl. `reactflow__edge-<s>a-<t>a`
 id); edge/node REST is create-only — deletion = canvas click on edge interaction path + Delete
-key; tables are per-bot (create fresh, no cross-attach); After Repeat and On-Catch/After-Try all
+key; tables are per-bot (REST create-fresh; attach-existing is 405 — UI **Add an existing table** can still reuse); After Repeat and On-Catch/After-Try all
 wire DIRECTLY off their Start node, never chained after siblings; runs trigger only from the UI
 (no REST trigger), verify via `GET /execution/`.
 
@@ -68,7 +70,8 @@ Write JavaScript `zw.*` API (local vs browser, setRef/getRef, deviceStorage, sta
 browserContext, packages): **[references/write-javascript.md]**. If a human is
 in the Write JS drawer (or pastes **Copy AI instructions** / **My
 references**), give **one pasteable script** — authoring contract in
-that file. Do not SendInput the buffer when they can paste.
+that file; put constants (`tableRefId`, `varRefId`) at the top. Do not
+SendInput the buffer when they can paste.
 
 Verified build patterns — native list scrape (CSS `{loop_index}`: `:nth-child` or `>> nth=`), nested-loop pagination, tabs + nested loops (Pattern 9),
 scheduled Dynamic scrape + keyword email (Pattern 10), webhook + HTTP work queue + branch rejoin (Pattern 11),
@@ -291,7 +294,10 @@ assembly; drawers for config the API cannot write.
    - Many rows → native table (default). Sheets only if a human must share/filter
      outside ZeroWork. CSV import creates a native table.
    - REST: `POST /data_group/` `{name, type:'NATIVE', columns:[{colName}…], connector_id}`.
-     Tables are **per-bot** — never reuse another bot's table id.
+     Tables are **per-bot**. REST has no attach-existing-table route (405).
+     The UI (1.1.75) can **Add an existing table** — do not collapse this
+     to "tables can never be reused". Never paste another bot's table id
+     into REST create.
    - Overwrite-each-run → `delete_table_data` (all rows) **before** the Standard loop
      (**truncate-then-refill**, Pattern 17). On a Sheets-linked table this
      clears the spreadsheet.
@@ -309,6 +315,7 @@ assembly; drawers for config the API cannot write.
      Loop either like a native table (Pattern 18). Never bake a Sheets URL.
 4. **Assemble (REST-first)** ([rest-api.md](references/rest-api.md)):
    - Create bot: `POST /connector/` `{name}` (or `/workflows` → "New TaskBot").
+     Names must be **unique** (1.1.61) — a colliding create fails.
    - `POST /node/` × N with **canonical** `type` strings ([node-types.md](references/node-types.md));
      verify `react-flow__node-<type>` (not `node-default`). **Never ship
      `node-default` husks on a client bot** — the playground has 25 as a
@@ -373,10 +380,14 @@ assembly; drawers for config the API cannot write.
    need a **linked** agent + awake machine. Scheduler UI: Frequency
    Every day + Interval + unit Hours + N + optional "Delay hour-based
    start by X minutes" + optional time range + Timezone; REMOVE /
-   RESCHEDULE; cadence and TZ are per-bot; no catch-up. Webhook UI:
-   one `https://webhook.zerowork.io/trigger/<token>` URL;
+   RESCHEDULE; cadence and TZ are per-bot; no catch-up. Webhook UI
+   (live-verified): one `https://webhook.zerowork.io/trigger/<token>` URL;
    active/inactive toggle; copy; delete=rotate. A bot can have a
    webhook configured but inactive. No method picker (inbound POST).
+   Official docs also allow **GET or POST** plus query-params (same
+   case-sensitive variable / JSONPath rules as the body). Multi-agent
+   (1.1.74): `https://webhook.zerowork.io/s=<TASKBOT_KEY>&agent=<AGENT_ID>`
+   — scheduler cannot target an Agent yet.
    Deactivated nodes stay wired (react-flow class `deactive`) — the
    canvas lies about what runs.
 8. **Verify** — `GET /execution/` (`result`, `errors_count`, `run_duration`)

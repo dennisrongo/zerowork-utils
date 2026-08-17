@@ -56,6 +56,11 @@ Selector-driven web blocks share: CSS/XPath selector + **Selector
 options** collapsible + min/max sec + **V / T** insert helpers.
 **Check Web Element** also has **Selector must be visible on screen**.
 **Hover** does not.
+Per-block min/max delay always fires **AFTER** the action. To delay
+**before** Click / Save / Insert / Keyboard / Check, raise the
+**preceding** block (or drop a Delay block). Selector timeout is not
+delay: 30–60s is abandoned as soon as the element is found (does not
+slow a hit).
 
 ---
 
@@ -140,7 +145,9 @@ options** collapsible + min/max sec + **V / T** insert helpers.
 - **Config / drawer fields:** Each group defaults to **Use current
   defaults**. Override: **Launch mode** Incognito vs Sticky (+ Sticky
   profile ID / COPY PROFILE ID); **Bypass bot detection**; **Run in
-  background**; **Maximize**; **Window size** W×H; **Cookies** JSON
+  background**; **Maximize**; **Window size** W×H; **Custom** profile
+  field (1.1.75 — accepts plain text, expressions, or variable/table
+  refs); **Cookies** JSON
   (`name`,`value`,`domain`) + ADD COOKIE; **Proxy** `host:port` or
   `socks5://host:port`, user/pass (HTTP only), bypass domains; **Browser**
   Default Chrome vs custom executable path; **Launch arguments**
@@ -159,7 +166,8 @@ options** collapsible + min/max sec + **V / T** insert helpers.
   one). Sticky attach (profile already live): browser-level settings
   (background, bypass, size, engine, args) are **ignored**; cookies /
   scripts / page-visibility still apply. Bypass ignores window size, launch
-  args, browser engine; blocks uploads ≳ 50 MB. Background + stay-on-page
+  args, browser engine; blocks uploads ≳ 50 MB (the general Upload
+  File cap is **390 MB**, 1.1.72 — both limits are true). Background + stay-on-page
   leaves an invisible browser. Closing the last tab ends the context.
   The live drawer is a long stack of tri-state radios (`Use current
   defaults` / `On` / `Off`); Stay-on-page is near the **bottom**. Click
@@ -247,7 +255,9 @@ options** collapsible + min/max sec + **V / T** insert helpers.
   https://the-internet.herokuapp.com/checkboxes).
 - **Gotchas:** Prove uniqueness with `querySelectorAll`. Custom-styled
   "dropdowns" (`div`/`button`) are Clicks, not Select. First-letters-cut
-  on a following Insert Text → Click the field first.
+  on a following Insert Text → Click the field first. Per-block delay
+  is AFTER this click — raise **this** block (not the next) to wait
+  before the following action.
   Skip-if-not-found **off** + a missing selector is a catchable
   error (Pattern 4 uses `definitely-not-present-element` on
   purpose). Skip-if-not-found **on** swallows the miss without
@@ -281,9 +291,14 @@ options** collapsible + min/max sec + **V / T** insert helpers.
   "did the HTTP call return 200?" save status + Set Condition.
 - **Gotchas:** Check timeout ≠ later block timeout. Official common
   problem: Check says Found, next Click/Save misses — race / overlay.
-  Re-Check or Delay immediately before the action. Increase timeout in
-  iframes. Select+click on Found / Not Found opens **no drawer** —
-  that is expected.
+  Re-Check or Delay immediately before the action. Increase selector
+  timeout to **30–60s** — unlike delay, timeout is **abandoned when
+  the element is found**. **Must be visible on screen** diagnostic:
+  Check + visible = Not Found → Keyboard-scroll the element into view
+  (prove with a 30s Delay + manual scroll). Per-block delay is AFTER
+  Check — raise the **preceding** block to wait before this Check.
+  Increase timeout in iframes. Select+click on Found / Not Found opens
+  **no drawer** — that is expected.
 
 ## Save Web Element (`save`)
 
@@ -307,7 +322,8 @@ options** collapsible + min/max sec + **V / T** insert helpers.
   **Prefer regular CSS selectors unless XPath is absolutely necessary.**
   Skip-if-not-found also prevents "continue until no element" from
   ending the loop (swallows the end condition — then you need
-  auto-scroll or Break).
+  auto-scroll or Break). Per-block delay is AFTER the save — raise
+  the **preceding** block to wait before this Save.
 
 ### Save Lists mode
 
@@ -356,7 +372,9 @@ options** collapsible + min/max sec + **V / T** insert helpers.
   Pattern 11). **Use spintax** is independent of the slider.
   **Insert instantly** checkbox (paste; selector required when on);
   min/max; **Encrypt content** (password — irreversible; delete and
-  re-enter to change).
+  re-enter to change). **1.1.75 breaking:** default typing is slower
+  (benchmarked human WPM). Keep the old speed with **Robotic, 0 delay**
+  or **Insert instantly**.
 - **Wiring / companions:** Single-out. Click the field first if the site
   swallows leading keystrokes. Pair with Keyboard Enter to submit if
   no-Enter is on.
@@ -365,7 +383,8 @@ options** collapsible + min/max sec + **V / T** insert helpers.
   cookies/sticky are not an option.
 - **Gotchas:** Instant-on → selector **required**. Instant-off → selector
   optional (types at caret; Wikipedia/Google often focus search). First
-  letters cut off → Click first, slower speed, or Delay. Table ref empty
+  letters cut off → Click first, slower speed, or Delay (raise the
+  **preceding** block — per-block delay is AFTER Insert). Table ref empty
   → not in a Dynamic loop. Selector is the **INPUT**, not the label
   (Pattern 8: `#username` / `#password` on the-internet.herokuapp.com, not a client form).
   Number inputs still use Insert Text (`input[type=number]`). Iframe:
@@ -425,7 +444,9 @@ options** collapsible + min/max sec + **V / T** insert helpers.
   Common-problem page: nothing happens = no focus, or the site eats
   keys. Not a substitute for Click on custom widgets. Empty key field
   can pass Detect errors but the scrape still fails — Page down to
-  load more must be **PageDown** (or End).
+  load more must be **PageDown** (or End). Per-block delay is AFTER
+  the key — raise this block (or the preceding one) to wait before
+  the next action.
 
 ---
 
@@ -446,13 +467,15 @@ options** collapsible + min/max sec + **V / T** insert helpers.
 - **Config / drawer fields:**
   - Start: value picker (variable / table column).
   - Set: operator + comparison operand (literal, ref, or days-shift for
-    dates). 18 operators: `=` `≠` `<` `>` `≤` `≥`; Contains / Does not
-    contain; Data found (not empty) / Data not found (empty); Longer than /
-    Shorter than (char length); Before (Date) / After (Date) + **days
+    dates). 18 operators: `=` `≠` `<` `>` `≤` `≥`; **Contains / Does not
+    contain** (official: comma-separated **keywords** — this IS the
+    keywords operator, not a live-only extra; UI may label it Contains
+    keywords); Data found (not empty) / Data not found (empty); Longer than /
+    Shorter than (char length only — a second-text operand is invalid
+    since 1.1.61); Before (Date) / After (Date) + **days
     shift** (pos or neg); Is a valid number / Is not a valid number;
-    **ELSE** ("if no other condition is met"). Live client drawers also expose **Contains keywords**
-    (comma-separated tokens) as a comparison type — Pattern 10 brand
-    filter. Pick the Start Condition reference via **My references**.
+    **ELSE** ("if no other condition is met"). Pick the Start Condition
+    reference via **My references**.
 - **Wiring / companions:** Start Condition is **branch-capable** (N Set
   Condition blocks off it). Each Set Condition is **single-out**. Chain
   another Start/Set pair for AND-across-fields. Always include **ELSE** ("if no other condition is met")
@@ -463,7 +486,10 @@ options** collapsible + min/max sec + **V / T** insert helpers.
   column + EQUALS `true` (Pattern 15) enables/disables targets from the table.
 - **Gotchas:** Numeric `<` `>` throw on non-numeric strings (`TEST123 > 50`
   errors; `51.77 > 50` is fine). Sanitize first (math **Remove format**,
-  or regex). Date formats on both sides **must match**. Deactivating a
+  or regex). Date formats on both sides **must match**. **Before/After
+  is exclusive of the shifted day:** 10 Jul + 3 days → comparison date
+  is 13 Jul; After matches **14+** (not 13+); Before matches **12-**.
+  Equal-to-shifted-date does **not** match. Deactivating a
   condition **and** its Sets makes the next path **random**.
 
 ## Start Repeat (`loop`)
@@ -483,14 +509,17 @@ options** collapsible + min/max sec + **V / T** insert helpers.
   Dynamic. Standard sub-modes: **Fixed repetitions** (INPUT placeholder
   `Enter number of repetitions` — not a textarea); **Continue until no
   element is found**; **Count elements matching selector** + **Lead selector** (Pattern 16 `section main a[href*="/p"]`; Pattern 17 `a[href*=products]` + Save WE `a[href*=products] >> nth={loop_index,0}`).
-  Optional **Start from** (element/row number). **Auto-scroll** checkbox.
-  **Auto-continue from last row or element** (resume across runs).
+  Optional **Start from** (element/row number). **Auto-scroll** checkbox
+  — **default ON** in all loop setups except Dynamic (1.1.61). Disable
+  it if you already Keyboard / Write-JS scroll (do not stack). Official
+  auto-scroll page is a stub. **Auto-continue from last row or element**
+  (resume across runs).
   Dynamic extras: **Newest rows first (reverse order)** checkbox;
   optional **Start from** row; optional **repetition limit**. Bind
   the existing table via **My references** — dropdown **labels can
   be stale** (hidden numeric ref id is truth); never paste another
-  bot's table id. Sheets additional option: write-batch size
-  (default 50).
+  bot's table id. Sheets Additional options: write-batch size
+  (default 50) and **real-time sync** (1.1.69).
 - **Wiring / companions:** **Branch-capable**. Output 1 = loop body.
   Output 2 = **After Repeat** (must come off this node). MAY have multiple
   outgoing edges. Body includes every block until After Repeat / end.
@@ -508,8 +537,9 @@ options** collapsible + min/max sec + **V / T** insert helpers.
     when you know page size (10 LinkedIn results).
   - `{loop_index}` / `{loop_index,start}` / `{loop_index,start,step}` /
     `{loop_index_NODEID}` — see platform-primitives.md.
-  - Auto-scroll official page is a stub; it fails on some virtual lists
-    (Keyboard fallback).
+  - Auto-scroll official page is a stub; default ON except Dynamic.
+    Fails on some virtual lists (Keyboard fallback). Disable if you
+    already custom-scroll.
   - Auto-continue: Dynamic = next **row**; Standard = next **list
     selector**. `Start from` is a floor.
   - Loop type can be **UNSET** (neither Standard nor Dynamic
@@ -664,7 +694,8 @@ options** collapsible + min/max sec + **V / T** insert helpers.
 - **Purpose:** Arithmetic and numeric cleanup.
 - **Config / drawer fields:** operation select: **Add** (also concatenates
   strings) / Subtract / Multiply / Divide / Remainder / Round / Round up /
-  Round down / **Random** (default range 0–1e9) / **Set decimals** /
+  Round down / **Random** (default range 0–1e9; 1.1.72 checkbox
+  **Generate a whole number (no decimals)**) / **Set decimals** /
   **Remove format** (`1,500,500.2` → `1500500.2`; also `1.000.000,23` →
   `1000000.23`; mixed grouping errors). Number field + number-to-operate-on
   (literal or ref); save-to.
@@ -737,8 +768,10 @@ options** collapsible + min/max sec + **V / T** insert helpers.
 - **Config / drawer fields:** table picker; **key column** (specify one — faster);
   **Preserve newest** rows (native tables only, not Sheets). File columns
   are ignored in the comparison.
-- **Wiring / companions:** Single-out. Place **after** the scrape loop,
-  never inside it (batch; inside a loop it still runs only once).
+- **Wiring / companions:** Single-out. Place **after** the scrape loop.
+  Native tables: still runs **once** even if placed inside a loop.
+  Sheets (1.1.69): **can run every iteration** — do not put it inside
+  a Sheets loop unless you want per-row dedup.
 - **When to use vs adjacent:** After Save Lists. Prevent-rerun while
   iterating = Update Data status + condition, not this.
 - **Gotchas:** Always specify a column unless you have a reason not to.
@@ -820,7 +853,8 @@ options** collapsible + min/max sec + **V / T** insert helpers.
   RESPONSE has **three independent slots**: body → Variables or a table;
   **multiple Nested record path** entries, e.g.
   `data.records[0]['fields']['Job URL']` or `choices[0]['text']`;
-  **Save response status code** → table column. Each slot is optional;
+  **Save response status code** → table column; **full object** save
+  (1.1.69 — not only nested paths). Each slot is optional;
   min/max.
 - **Wiring / companions:** Single-out. Create dest columns first. Replace
   `"` → `'` in dynamic JSON bodies (Format Replace). Condition + Break
@@ -909,7 +943,9 @@ See [write-javascript.md](write-javascript.md) for the full `zw` API.
   be referenced via **From file URL** (Upload FAQ). Save File cannot
   write a file column (path/URL → standard column). Creating a
   file-column value in the table UI is still a table action.
-- **Gotchas:** Bypass detection blocks uploads ≳ 50 MB. **From folder
+- **Gotchas:** Hard cap **390 MB** (1.1.72; does not apply to downloads).
+  Bypass detection **also** blocks uploads ≳ 50 MB — both limits are
+  true. **From folder
   path on your computer** is the **Agent machine**, not the creator browser. Prefer **From file URL** for a portable demo (`https://raw.githubusercontent.com/github/gitignore/main/README.md`). Detect errors
   **names the node** if File source is unset. Requires a prior Click
   on the file input (`#file-upload`). From file URL also accepts a
@@ -928,8 +964,10 @@ See [write-javascript.md](write-javascript.md) for the full `zw` API.
   allowed.
 - **Wiring / companions:** Single-out. After Click Next (pagination race),
   between HTTP calls, after Keyboard reload.
-- **When to use vs adjacent:** Explicit wait. Per-block min/max fires
-  **after** that block. `zw.delay` is milliseconds.
+- **When to use vs adjacent:** Explicit wait **before** the next action.
+  Per-block min/max on other nodes fires **after** that node — raise
+  the **preceding** block (or use this Delay) for selector / Insert-cutoff
+  races. `zw.delay` is milliseconds.
 - **Gotchas:** Empty field → block **skipped**. max < min → wait min.
   Both 0 → no pause. Invalid ref → skipped.
 
@@ -991,7 +1029,8 @@ See [write-javascript.md](write-javascript.md) for the full `zw` API.
 - **When to use vs adjacent:** No-code breadcrumb. `zw.log` / `zw.logTemp`
   from JS (`logTemp` = not persisted — use for secrets).
 - **Gotchas:** Empty message = warning, run still succeeds. Don't log
-  secrets. Reports do not store `console.log`.
+  secrets. Reports do not store `console.log`. Persistent log messages
+  are capped at **5,000 per run** (1.1.61).
 
 ---
 
@@ -1065,7 +1104,8 @@ See [write-javascript.md](write-javascript.md) for the full `zw` API.
   edges. **Destructive nodes left deactivated = production hygiene**
   (Follow / Post / Send / Delete-all test sub-flow — Patterns 14, 16).
   A Delay block is an explicit wait **before** the next action;
-  per-block delay is **after**.
+  per-block delay is **after** — raise the preceding block, not the
+  failing one.
 - **Gotchas:** Deactivating a Start Condition **and** its Sets makes the
   next path **random**. Multi-select: Shift+drag or Cmd/Ctrl+click.
   Randomizing inter-block delays (3–15s example) can greatly slow the run.
@@ -1082,39 +1122,39 @@ Internal canvas types also include `fake` and `delete` (not user-facing).
 | Save Page URL | Save current page URL to picker; no min/max |
 | Switch or Close Tab | Action Switch/Close; Target Latest/Previous/Next/Tab URL matching (full/partial/regex)/Tab number (default 1); min/max |
 | Go Back or Forward | radios Go back/Go forward (live default NEITHER — dead default footgun); min/max |
-| Launch Browser | bypass bot detection, background, maximize, window size, cookies, proxy, browser engine, launch args, scripts, page visibility (tri-state), sticky/incognito |
+| Launch Browser | bypass bot detection, background, maximize, window size, Custom profile field (plain text / expr / refs, 1.1.75), cookies, proxy, browser engine, launch args, scripts, page visibility (tri-state), sticky/incognito |
 | Quit Browser | Force quit checkbox (unchecked live); no min/max |
 | Switch Frame | radios Iframe / Main page (docs: Main frame; live drawer may say Main page); iframe selector required when Iframe selected (`iframe` or `#mce_0_ifr`); live default NEITHER — dead default, same class as Go Back; min/max 0/0 |
 | Browser Alert | optional Prompt response textarea; min/max 0/0; no Accept vs Dismiss control; palette label Browser Alert |
 | Click Web Element | textarea[CSS/XPath]; skip-if-not-found cb; open-in-new-tab cb; Perform right-click; Use human-like clicking; min/max |
 | Check Web Element | selector CSS/XPath; Selector options; must-be-visible cb; min/max; Found/Not Found are **no-drawer** markers (edge wiring, not a field) |
 | Save Web Element | textarea[CSS/XPath]; Save-as (Text / Link / Custom attribute + "Enter attribute" / HTML / Image file URL); Save-to table column or Variables; skip-if-missing cb; min/max |
-| Insert Text or Data | Content textarea; Use spintax CHECKED by default (independent of speed); Don't press Enter; optional selector; speed slider PRO/FAST/AVERAGE/SLOW/VERY SLOW when instant unchecked; Insert instantly cb; min/max |
+| Insert Text or Data | Content textarea; Use spintax CHECKED by default (independent of speed); Don't press Enter; optional selector; speed slider PRO/FAST/AVERAGE/SLOW/VERY SLOW when instant unchecked; 1.1.75 default slower — Robotic 0-delay or Insert instantly; Insert instantly cb; min/max |
 | Hover Web Element | selector + Selector options + min/max; NO must-be-visible cb |
 | Select Web Dropdown | Dropdown option; dropdown selector; Selector options; min/max |
 | Keyboard Action | key picker UI; min/max |
 | On Catch / After Try-Catch / Break Repeat / After Repeat / Found / Not Found / Abort Run | **No drawer** — select+click often opens nothing |
 | Raise Error | optional message (default "A custom error was raised."); Mark run failed in run report cb; Include in error report cb (both unchecked live) |
-| Start Repeat | Standard vs Dynamic; Fixed / Continue-until-no-element / Count-elements; repetition INPUT `Enter number of repetitions`; Auto-scroll; Start-from; Auto-continue; Dynamic: Newest rows first (reverse), repetition limit, table via My references (label can be stale) |
-| Start / Set Condition | Start = value picker; Set = 18 operators + operand / ELSE ("if no other condition is met") |
+| Start Repeat | Standard vs Dynamic; Fixed / Continue-until-no-element / Count-elements; repetition INPUT `Enter number of repetitions`; Auto-scroll default ON except Dynamic; Start-from; Auto-continue; Dynamic: Newest rows first (reverse), repetition limit, table via My references (label can be stale); Sheets Additional: batch 50 + real-time sync |
+| Start / Set Condition | Start = value picker; Set = 18 operators + operand / ELSE ("if no other condition is met"); Contains = comma-separated keywords; Before/After exclusive of shifted day |
 | Update Data | value textarea (empty = clear); two MUI selects; Use spintax cb |
-| Number Operations | Add/Subtract/Multiply/Divide/Remainder/Round/Round up/Round down/Random/Set decimals/Remove format; operands; save-to |
+| Number Operations | Add/Subtract/Multiply/Divide/Remainder/Round/Round up/Round down/Random (whole-number checkbox 1.1.72)/Set decimals/Remove format; operands; save-to |
 | Format Data | Remove word / Replace / Shorten / case / Normalize URL / Trim / line breaks / smileys; input; save-to |
 | Split Text | live empty default: only Text to split picker; then separator + positions |
 | Apply Regex | Extract / Check / Replace; pattern `/example/`; Text-to-apply; Save result to |
-| Remove Duplicates | table picker; column; Preserve newest (native only) |
+| Remove Duplicates | table picker; column; Preserve newest (native only); native once / Sheets every iteration (1.1.69) |
 | Delete Data | live empty default: only Delete from picker; official all vs one |
 | Ask ChatGPT | Model select; prompt textarea; Save answer to |
 | Send Notification | Subject; Email content; min/max; no To: field (signed-in account email) |
-| Send HTTP Request | Method; URL; HEADERS (Bearer {id, name}); BODY / SAVE RESPONSE three independent slots (body / nested paths / Save response status code); min/max |
+| Send HTTP Request | Method; URL; HEADERS (Bearer {id, name}); BODY / SAVE RESPONSE three independent slots (body / nested paths / Save response status code) + full-object save (1.1.69); min/max |
 | Write JavaScript | MONACO; Run locally cb |
 | Save File | source radios; folder/path; file options; min/max |
-| Upload File | previous-step Upload-button tip; From file URL / From folder path on your computer (live NEITHER); min/max |
+| Upload File | previous-step Upload-button tip; From file URL / From folder path on your computer (live NEITHER); 390 MB hard cap + Bypass ~50 MB; min/max |
 | Delay | min/max sec |
 | Record Date | Select date format dropdown (nothing selected live); no min/max |
 | Take Screenshot | Visible page/Full page/Web element; .png/.jpeg; folder `/Users/<your-username>/Downloads`; File options; min/max |
 | Save from Clipboard | Save copied text to picker; no min/max |
-| Log | textarea[message]; tag; status (Success/Fail/Warning) |
+| Log | textarea[message]; tag; status (Success/Fail/Warning); 5,000 messages/run |
 | Run TaskBot | Select a TaskBot dropdown; Wait until finishes CHECKED=sync / uncheck=fire-and-forget; no min/max |
 
 ## Save-to pickers (the fiddly part)

@@ -1,8 +1,31 @@
 /* X home-feed harvest-while-scroll.
    Paste into Write JS. Browser execution (do NOT tick Run locally).
-   Table id: leave TABLE = 0 to resolve via zw.getTaskbotInfo(), or paste
-   the ref_id from the drawer's My references. Never copy another bot's id.
-   Unique key = status id. Stop after 3 empty scroll rounds or MAX posts. */
+   tableRefId / varRefId resolve via zw.getTaskbotInfo() so this is not
+   bound to one bot. Change tableRefId to your own if My references
+   already shows it. Unique key = status id. Stop after 3 empty scroll
+   rounds or MAX posts. */
+// Reference: https://docs.zerowork.io/using-zerowork/using-building-blocks/write-javascript
+const info = await zw.getTaskbotInfo();
+const varRefId = (info && info.variables && info.variables.ref_id) ? info.variables.ref_id : 0;
+const TABLE_NAME = "x_feed_posts";
+var _tables = (info && info.tables) ? info.tables : [];
+var _t;
+for (var _ti = 0; _ti < _tables.length; _ti++) {
+  if (_tables[_ti].name === TABLE_NAME) { _t = _tables[_ti]; break; }
+}
+if (!_t) {
+  for (var _tj = 0; _tj < _tables.length; _tj++) {
+    if (_tables[_tj].type === "ZW_NATIVE" && _tables[_tj].name !== "Variables") {
+      _t = _tables[_tj];
+      break;
+    }
+  }
+}
+if (!_t || !_t.ref_id) {
+  throw new Error("No native table on this TaskBot — create one, or set tableRefId from My references");
+}
+const tableRefId = _t.ref_id;
+const domain = "https://x.com";
 function txt(el, sel) {
   if (!el) return "";
   var n = typeof sel === "string" ? el.querySelector(sel) : sel;
@@ -17,7 +40,7 @@ function firstHref(el, sel) {
 function absUrl(href) {
   if (!href) return "";
   if (href.indexOf("http") === 0) return href.split("?")[0];
-  return "https://x.com" + href.split("?")[0];
+  return domain + href.split("?")[0];
 }
 function countFrom(el, testid) {
   var n = el.querySelector('[data-testid="' + testid + '"]');
@@ -91,8 +114,6 @@ if (/\/i\/flow\/login|\/login/i.test(location.href) ||
   throw new Error("X session missing");
 }
 
-var TABLE_NAME = "x_feed_posts";
-var TABLE = 0;
 var MAX = 40;
 var EMPTY_STOP = 3;
 var seen = {};
@@ -100,27 +121,6 @@ var posts = [];
 var emptyRounds = 0;
 var rounds = 0;
 var roundLog = [];
-
-if (!TABLE) {
-  var info = await zw.getTaskbotInfo();
-  var tables = (info && info.tables) ? info.tables : [];
-  var t;
-  for (var ti = 0; ti < tables.length; ti++) {
-    if (tables[ti].name === TABLE_NAME) { t = tables[ti]; break; }
-  }
-  if (!t) {
-    for (var tj = 0; tj < tables.length; tj++) {
-      if (tables[tj].type === "ZW_NATIVE" && tables[tj].name !== "Variables") {
-        t = tables[tj];
-        break;
-      }
-    }
-  }
-  if (!t || !t.ref_id) {
-    throw new Error("No native table on this TaskBot — create one, or set TABLE from My references");
-  }
-  TABLE = t.ref_id;
-}
 
 function harvest() {
   var cards = document.querySelectorAll('article[data-testid="tweet"]');
@@ -147,7 +147,7 @@ function harvest() {
       post_id: sid,
       author: author,
       handle: handle,
-      author_url: handle ? "https://x.com/" + handle : "",
+      author_url: handle ? domain + "/" + handle : "",
       post_text: body.slice(0, 49000),
       posted_at: posted,
       post_url: sid ? absUrl(statusHref) : "",
@@ -184,7 +184,7 @@ for (var p = 0; p < posts.length; p++) {
   var names = Object.keys(row);
   for (var k = 0; k < names.length; k++) {
     await zw.setRef({
-      ref_id: TABLE,
+      ref_id: tableRefId,
       name: names[k],
       value: String(row[names[k]] == null ? "" : row[names[k]]),
       appendIndex: p
