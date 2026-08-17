@@ -1212,8 +1212,8 @@ class TestCssFirstSelectorsAndPattern9(unittest.TestCase):
 
     def test_version_is_1_3_18(self):
         skill = (SKILL_ROOT / "SKILL.md").read_text(encoding="utf-8")
-        self.assertIn("version: 1.3.19", skill)
-        self.assertNotIn("version: 1.3.18", skill)
+        self.assertIn("version: 1.3.20", skill)
+        self.assertNotIn("version: 1.3.19", skill)
 
     def test_css_first_rule_and_nth_filter(self):
         docs = self._docs()
@@ -1331,8 +1331,8 @@ class TestClientPatterns10And11(unittest.TestCase):
 
     def test_version_is_1_3_18(self):
         skill = self._docs()["skill"]
-        self.assertIn("version: 1.3.19", skill)
-        self.assertNotIn("version: 1.3.18", skill)
+        self.assertIn("version: 1.3.20", skill)
+        self.assertNotIn("version: 1.3.19", skill)
 
     def test_pattern10_scheduled_dynamic_scrape(self):
         docs = self._docs()
@@ -1439,8 +1439,8 @@ class TestClientPatterns13To16(unittest.TestCase):
 
     def test_version_is_1_3_18(self):
         skill = self._docs()["skill"]
-        self.assertIn("version: 1.3.19", skill)
-        self.assertNotIn("version: 1.3.18", skill)
+        self.assertIn("version: 1.3.20", skill)
+        self.assertNotIn("version: 1.3.19", skill)
 
     def test_pattern13_linkedin_outreach_dm(self):
         docs = self._docs()
@@ -1573,8 +1573,8 @@ class TestClientPatterns17To19(unittest.TestCase):
 
     def test_version_is_1_3_18(self):
         skill = self._docs()["skill"]
-        self.assertIn("version: 1.3.19", skill)
-        self.assertNotIn("version: 1.3.18", skill)
+        self.assertIn("version: 1.3.20", skill)
+        self.assertNotIn("version: 1.3.19", skill)
 
     def test_pattern17_two_phase_no_run_taskbot(self):
         docs = self._docs()
@@ -1726,8 +1726,8 @@ class TestDocsSweep1318(unittest.TestCase):
 
     def test_version_is_1_3_18(self):
         skill = self._docs()["skill"]
-        self.assertIn("version: 1.3.19", skill)
-        self.assertNotIn("version: 1.3.18", skill)
+        self.assertIn("version: 1.3.20", skill)
+        self.assertNotIn("version: 1.3.19", skill)
 
     def test_exclusive_after_date(self):
         catalog = self._docs()["catalog"]
@@ -1806,8 +1806,8 @@ class TestWriteJsConstants1319(unittest.TestCase):
 
     def test_version_is_1_3_19(self):
         skill = self._docs()["skill"]
-        self.assertIn("version: 1.3.19", skill)
-        self.assertNotIn("version: 1.3.18", skill)
+        self.assertIn("version: 1.3.20", skill)
+        self.assertNotIn("version: 1.3.19", skill)
 
     def test_constants_at_the_top_convention(self):
         docs = self._docs()
@@ -1843,6 +1843,71 @@ class TestWriteJsConstants1319(unittest.TestCase):
                     "%s must not contain live id %s" % (name, token),
                 )
 
+
+
+class TestSkill1320ReadmeAndJobIntake(unittest.TestCase):
+    """1.3.20: README stays in sync; Job intake; login never in the skill."""
+
+    def _readme(self) -> str:
+        return (SKILL_ROOT.parents[1] / "README.md").read_text(encoding="utf-8")
+
+    def _skill(self) -> str:
+        return (SKILL_ROOT / "SKILL.md").read_text(encoding="utf-8")
+
+    def test_version_is_1_3_20(self):
+        skill = self._skill()
+        self.assertIn("version: 1.3.20", skill)
+        self.assertNotIn("version: 1.3.19", skill)
+
+    def test_readme_matches_1320(self):
+        readme = self._readme()
+        self.assertIn("1.3.20", readme)
+        self.assertIn("CSS-first", readme)
+        self.assertIn("tableRefId", readme)
+        self.assertIn("Job intake", readme)
+        self.assertNotIn("XPath for grids", readme)
+
+    def test_skill_has_readme_sync_and_job_intake(self):
+        skill = self._skill()
+        self.assertIn("Job intake", skill)
+        self.assertIn("README skill section", skill)
+        self.assertIn("same change", skill)
+        self.assertIn("skill version bump", skill)
+
+    def test_login_never_stored_in_skill_or_readme(self):
+        for blob in (self._skill(), self._readme()):
+            self.assertIn("Never store passwords", blob)
+            self.assertIn("cookie JSON", blob)
+            self.assertIn("2FA", blob)
+            self.assertIn("session tokens", blob)
+            self.assertIn("Never type credentials", blob)
+            self.assertIn("Agent Chrome", blob)
+            self.assertIn("Detect errors only", blob)
+            self.assertIn("Do not Run client bots unless he says", blob)
+
+
+
+class TestRepoRootAgentsFiles(unittest.TestCase):
+    """Repo-root AGENTS.md / CLAUDE.md. Search from repo root, not only the skill folder."""
+
+    def test_agents_and_claude_md_at_repo_root(self):
+        repo_root = SKILL_ROOT.parents[1]
+        agents = None
+        claude = None
+        for path in repo_root.iterdir():
+            if not path.is_file():
+                continue
+            if path.name == "AGENTS.md":
+                agents = path
+            elif path.name == "CLAUDE.md":
+                claude = path
+        self.assertIsNotNone(agents, "AGENTS.md missing at repo root")
+        self.assertIsNotNone(claude, "CLAUDE.md missing at repo root")
+        agents_text = agents.read_text(encoding="utf-8")
+        claude_text = claude.read_text(encoding="utf-8")
+        self.assertIn("tableRefId", agents_text)
+        self.assertIn("Detect errors", agents_text)
+        self.assertIn("@AGENTS.md", claude_text)
 
 
 if __name__ == "__main__":

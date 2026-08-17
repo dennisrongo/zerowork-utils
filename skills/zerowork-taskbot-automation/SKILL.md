@@ -1,7 +1,7 @@
 ---
 name: zerowork-taskbot-automation
 description: "Use when building, running, or automating ZeroWork TaskBots."
-version: 1.3.19
+version: 1.3.20
 author: Dennis Rongo (@codingmenace)
 license: MIT
 metadata:
@@ -18,6 +18,12 @@ Automate the ZeroWork platform itself: desktop agent lifecycle, building TaskBot
 - "build/create/run a ZeroWork TaskBot", "automate ZeroWork", ZeroWork client build or troubleshooting work
 - Researching ZeroWork: full docs index at https://docs.zerowork.io/llms.txt (every page has a .md version — append `.md` to any docs URL)
 
+## Skill maintenance
+
+**Standing rule:** the repo README skill section (`README.md` at the
+repo root) must be updated in the same change as any skill version bump (patterns, selector policy, Write JS convention, new templates,
+Job intake). Do not ship a bump that leaves the README stale.
+
 ## SAFETY FIRST: Verify the account BEFORE touching anything
 
 ZeroWork sessions found in a browser may belong to someone else's workspace, not yours.
@@ -26,6 +32,39 @@ ZeroWork sessions found in a browser may belong to someone else's workspace, not
 2. If the bot list doesn't match the account you expect (unfamiliar names, missing bots you know should be there) → wrong account → stop and confirm with the account owner.
 3. To switch accounts: click "Log out" (clears the local cookie only — harmless), then the owner logs in themselves. Never type credentials.
 4. Navigating to `/login` while authenticated auto-redirects to `/workflows` — log out first.
+
+5. **Never store or type site logins.** Passwords, cookie JSON, 2FA
+   codes, and session tokens must never go in the skill, templates,
+   notes, or committed files. Never type credentials into a TaskBot.
+   Dennis does all site logins himself (Agent Chrome, cookies, 2FA).
+   A brief may say "logged-in site"; the human signs in on Agent
+   Chrome before Run.
+
+
+## Job intake
+
+An agent can take a client job from a brief without Dennis in the
+loop for the *build*. Required brief fields:
+
+- **Outcome** — table columns / email / webhook / DM cap (name the
+  human result)
+- **Site URL(s)** + public vs logged-in
+- **Pattern hint** if obvious (or pick from Patterns 1–19)
+- **Schedule / webhook / one-shot**
+- **Whether Run is allowed** — default: Detect errors only; do not
+  Run client bots or type passwords unless the brief says so
+- **Secrets** go in Variables via **My references**, never inline
+
+### Login and credentials (hard rule)
+
+Dennis does all site logins himself (Agent Chrome, cookies, 2FA).
+
+- Never store passwords, cookie JSON, 2FA codes, or session tokens
+  in the skill, templates, notes, or committed files.
+- Never type credentials into a TaskBot.
+- The job brief may say "logged-in site"; the human signs in on
+  Agent Chrome before Run.
+- Default: build + Detect errors only. Do not Run client bots unless he says.
 
 ## Desktop Agent lifecycle
 - Installed at `%LOCALAPPDATA%\Programs\ZeroWork\ZeroWork.exe` (Electron tray app, no UI)
