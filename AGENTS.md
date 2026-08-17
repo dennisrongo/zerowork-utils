@@ -4,7 +4,9 @@ This repo is **zerowork-utils**: the ZeroWork TaskBot agent skill plus the Ubunt
 
 ## Start here
 
-Read `skills/zerowork-taskbot-automation/SKILL.md` first (version is in the frontmatter; currently **1.3.20**). Depth lives in `skills/zerowork-taskbot-automation/references/`. Do not duplicate that material here.
+Read `skills/zerowork-taskbot-automation/SKILL.md` first when building a TaskBot (version is in the frontmatter; currently **1.3.20**). Depth lives in `skills/zerowork-taskbot-automation/references/`. Do not duplicate that material here.
+
+When the user gives a ZeroWork workflow URL or TaskBot name to recreate in Playwright, use `skills/zerowork-to-playwright/SKILL.md` (currently **1.1.1**) — the inverse path. Ports are not done until E2E (`npx playwright test`); keep data parity; fix stale canvas bugs only in the Playwright port. Do not build a new TaskBot for that request.
 
 **Keep `README.md` in sync with every skill version bump.**
 
@@ -26,4 +28,5 @@ Need: outcome, site URL(s) + public vs logged-in, schedule/webhook/one-shot, whe
 ```
 python skills/zerowork-taskbot-automation/scripts/check_skill_coverage.py
 python -m unittest skills/zerowork-taskbot-automation/tests/test_skill_coverage_and_helpers.py -v
+python -m unittest skills/zerowork-to-playwright/tests/test_skill.py -v
 ```

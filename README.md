@@ -3,6 +3,7 @@
 Utilities for the [ZeroWork](https://zerowork.io) browser-automation platform:
 
 - **`skills/zerowork-taskbot-automation/`** — a production-tested agent skill for building, configuring, and running ZeroWork TaskBots programmatically (undocumented REST API, all 44 node types, canvas automation, verified build patterns).
+- **`skills/zerowork-to-playwright/`** — the inverse path: given an existing TaskBot URL or name, recreate the entire workflow as local Playwright (read-only on the live bot).
 - **`ubuntu-chrome-zerowork-installation.sh`** — a one-command installer that sets up an Ubuntu VPS with a full desktop environment, Google Chrome, and the ZeroWork agent.
 
 ## ZeroWork TaskBot Automation (agent skill)
@@ -161,6 +162,10 @@ python -m unittest skills/zerowork-taskbot-automation/tests/test_skill_coverage_
 ```
 
 This parses the real skill markdown and asserts every palette type and official building-block URL has purpose, config, wiring, when-to-use, and gotchas.
+
+## ZeroWork → Playwright (inverse skill)
+
+**`skills/zerowork-to-playwright/`** (**1.1.1**) is the opposite path: Dennis gives a TaskBot URL (`https://creator.zerowork.io/workflows/<id>`) or name, and the agent recreates the entire graph as local Playwright. Read-only on the live bot; E2E required (write-only is a midpoint); data parity with live table/column/variable names; stale canvas bugs are fixed only in the Playwright port. Dennis does all site logins. Entry: [`skills/zerowork-to-playwright/SKILL.md`](skills/zerowork-to-playwright/SKILL.md). Block map: [`playwright-recreation-map.md`](skills/zerowork-taskbot-automation/references/playwright-recreation-map.md).
 
 ## Install ZeroWork on Ubuntu (VPS)
 

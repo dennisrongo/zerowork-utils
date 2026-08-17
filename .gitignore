@@ -12,3 +12,6 @@ zw_refresh.txt
 zw_tree_now.json
 x_tree_now.json
 .DS_Store
+
+# Generated Playwright ports (auth/ and .env live here)
+playwright-ports/
