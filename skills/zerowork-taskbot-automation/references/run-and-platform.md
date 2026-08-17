@@ -158,13 +158,34 @@ run with `zw.temp.disableExtraBypass()` /
 
 ## Scheduler
 
-Click the scheduler icon. Pick a time or interval. First use: log in to the
-agent. Machine must be on and not asleep or the fire is **skipped** (no
-catch-up). Two machines: log the scheduler in only on the dedicated box.
+Click the scheduler icon (Manage scheduler → **Schedule** modal).
+
+Live UI shape (read-only facts):
+
+- **Frequency / Select how often:** e.g. **Every day**
+- **Select when:** **Interval** + unit (**Hours**) + interval **N**
+- optional **"Delay hour-based start by X minutes"**
+- optional **"Run within a time range"**
+- **Timezone** (IANA, e.g. `Europe/Berlin` / `America/Los_Angeles`)
+- Buttons: **REMOVE** / **RESCHEDULE**
+
+Cadence and timezone are **per-bot** — sibling bots can differ. First
+use: log in to the agent. Machine must be on and not asleep or the
+fire is **skipped** (**no catch-up**). Two machines: log the scheduler
+in only on the dedicated box. Linked agent + machine awake.
 
 ## Webhooks
 
-Generate from TaskBot Settings. POST or GET.
+Header **Webhook** icon → Webhook modal. Official docs mention POST or
+GET; the live modal has **no method picker** (inbound **POST**).
+
+Live UI shape:
+
+- Toggle **Webhook is active** / **Webhook is inactive**. A bot can
+  **HAVE** a webhook configured but **inactive**.
+- One URL: `https://webhook.zerowork.io/trigger/<token>`
+- Copy icon. Red delete icon = **rotate** (new token).
+- No method picker.
 
 - Full body is stored (stringified JSON) in auto-variable **`zw_webhook_data`**.
   Parse with `JSON.parse` in Write JS.
@@ -174,6 +195,7 @@ Generate from TaskBot Settings. POST or GET.
   prefix optional. Invalid path / no match = silent skip, not an error.
 - From another bot: Send HTTP Request to the webhook URL.
 - Deactivate with the toggle; rotate by deleting and regenerating.
+  Linked agent + machine awake.
 
 ## Sharing
 

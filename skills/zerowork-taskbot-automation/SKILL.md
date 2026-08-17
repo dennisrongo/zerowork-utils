@@ -1,7 +1,7 @@
 ---
 name: zerowork-taskbot-automation
 description: "Use when building, running, or automating ZeroWork TaskBots."
-version: 1.3.10
+version: 1.3.17
 author: Dennis Rongo (@codingmenace)
 license: MIT
 metadata:
@@ -70,8 +70,15 @@ in the Write JS drawer (or pastes **Copy AI instructions** / **My
 references**), give **one pasteable script** — authoring contract in
 that file. Do not SendInput the buffer when they can paste.
 
-Verified build patterns — native list scrape (XPath `{loop_index}`), nested-loop pagination,
-Write-JS table writes, try-catch/condition pipelines, browserless HTTP+ChatGPT chains, plus
+Verified build patterns — native list scrape (CSS `{loop_index}`: `:nth-child` or `>> nth=`), nested-loop pagination, tabs + nested loops (Pattern 9),
+scheduled Dynamic scrape + keyword email (Pattern 10), webhook + HTTP work queue + branch rejoin (Pattern 11),
+large branched form + webhook possibly inactive (Pattern 12),
+LinkedIn outreach DM + daily cap (Pattern 13), Dynamic enrich RUN LIST (Pattern 14),
+Facebook group scrape + criteria reply (Pattern 15), Instagram hashtag engage + vision comment (Pattern 16),
+two-phase collect then Dynamic enrich with no Run TaskBot (Pattern 17),
+Sheets as a table property (Pattern 18), HTTP status-only link check (Pattern 19),
+Write-JS table writes, try-catch/condition pipelines, browserless HTTP+ChatGPT chains,
+form input/select/upload (the-internet, including number/iframe/checkbox/shadow hard cases), plus
 the per-bot table-attachment rule: **[references/build-patterns.md]**
 
 Copyable helpers live in this skill — do not depend on Temp implementer
@@ -108,23 +115,73 @@ assembly; drawers for config the API cannot write.
 2. **Choose blocks** from [block-catalog.md](references/block-catalog.md). Defaults:
    - Open a URL → `open_link` (add `launch_browser` only if sticky/proxy/bypass/scripts
      must change before the first page).
-   - List scrape → Standard `loop` + `save` with `{loop_index}` (XPath for grids).
-     Paginated / infinite feeds → **nested Standard loops + Keyboard
-     PageDown/Space** first (Pattern 2 / 7). Write JS only if the
-     virtualizer still remounts cards so `{loop_index}` cannot hold a
-     stable list (find-selector in
+   - List scrape → Standard `loop` + `save` with CSS `{loop_index}`
+     (`:nth-child({loop_index})` on the repeating sibling, or
+     `>> nth={loop_index,1}` / `>> nth={loop_index}` /
+     `>> nth={loop_index,0}` — live client confirmation, 0-based). **Prefer regular CSS selectors unless XPath is absolutely necessary.**
+     Grids stay CSS — not a reason to switch to XPath. Paginated
+     lists → **nested Standard loops** (Pattern 2 / 9). Infinite /
+     virtualized feeds → Keyboard PageDown/Space first (Pattern
+     7); Keyboard **Space** also forces lazy LinkedIn sections
+     (Pattern 14); Keyboard **Enter** sends a Facebook Thread
+     composer DM (Pattern 15, no submit button). Write JS only if the virtualizer remounts cards so
+     `{loop_index}` cannot hold a stable list. CSS `{loop_index}`
+     does **not** fix virtualized X feeds (find-selector in
      [platform-primitives.md](references/platform-primitives.md)).
+   - Form fill → Insert Text (selector = the **INPUT**, not the
+     label; Pattern 8 `#username` / `#password`; number inputs
+     still use Insert Text, `input[type=number]`) + Select Web
+     Dropdown (`<select>` selector **AND** the option text;
+     Pattern 8 `#dropdown` + `Option 2`) + Upload File (Click the
+     file input first; prefer **From file URL**, portable demo
+     is the gitignore README). Iframe: Switch Frame (Iframe
+     selected, selector `iframe` or `#mce_0_ifr`) then Insert
+     Text on `body#tinymce`. Checkboxes:
+     Click `#checkboxes input:nth-of-type(1)`. Shadow DOM:
+     inspect slotted light DOM vs shadowRoot — on /shadowdom
+     `span[slot="my-text"]` is light DOM (plain CSS). Do not
+     always Write JS for /shadowdom. If a future run shows no
+     text change (span is not an input), Write JS on
+     `document.querySelector('my-paragraph').shadowRoot`
+     (browser, not Run locally). Practice site:
+     the-internet.herokuapp.com (not a client form). Pattern 8.
    - Name every node by role (`Clear previous rows`, `Page down to load
      more`). Add `sticky_note`s for login, selectors, and stop
-     conditions — notes are not executed.
+     conditions — notes are not executed. On client bots sticky notes
+     are **load-bearing** (selector history, branch intent).
    - Enrich existing rows → Dynamic `loop` + `open_link` (URL column) + `save`.
+     Dynamic extras: optional reverse ("Newest rows first"), start-from
+     row, auto-continue from last row, repetition limit. Bind the
+     existing table via **My references** — dropdown labels can be
+     stale; never paste another bot's table id.
+     Two-phase in one bot (no Run TaskBot): truncate → Standard collect
+     → After Repeat → Dynamic enrich the same table (Pattern 17).
    - Pagination → outer Standard `loop` (pages) → inner `loop` (items) →
      `continue_after_repeat` off the **inner** opener → `click` Next.
+     After Repeat wires DIRECTLY off its Start Repeat, never after
+     Save siblings. Loop type MUST be set (Standard vs Dynamic).
+     Continue-until-no-element needs a web-element action in the
+     body; set a repetition limit on long/endless lists.
+     Skip-if-not-found / Try-Catch swallows the end condition —
+     then you need auto-scroll or Break.
+   - Tabs → Open Link **open in new tab** (stays background) +
+     Switch or Close Tab. Prefer **Tab URL matching** (full /
+     partial / `/regex/flags`). Partial `/windows` also matches
+     `/windows/new` — be specific. Creation order ≠ visual
+     order; regular-browser mode cannot guarantee tab number.
+     Bring Pages to Front is a **run setting** for watching new
+     tabs. Pattern 9. Tab-number switching (Tab **2** then back to
+     Tab **1**) exists — still prefer URL match.
    - Optional web element → `check` (Found / Not Found), not a Set Condition.
      Found / Not Found are **no-drawer** outcome marker cards. Branching
-     is edge wiring off Check, not a drawer field.
+     is edge wiring off Check, not a drawer field. Both branches may
+     **rejoin** at a later node (not only dead-end). A **dead-end**
+     Found/Not Found (no outgoing edge) = skip row. **Inverted check:**
+     presence of a waitlist `input[placeholder=Email]` means unavailable.
    - Data tests → `check_dynamic_data` + N `conditionNode` (one operator each, include
-     **Else**). Sanitize numbers (`math` Remove format) before `<` `>`.
+     **ELSE** — "if no other condition is met"). Sanitize numbers (`math` Remove format) before `<` `>`.
+     Message-cap: EQUALS `{id, name: MessageCount}` → Break Repeat; ELSE continues
+     (Pattern 13). Pick refs with **V / My references**.
    - Start Repeat: pick **Standard** or **Dynamic**. Live Pattern 4 had
      loop type **UNSET** (neither selected). Detect errors may stay
      quiet — set Standard before a client build.
@@ -132,8 +189,13 @@ assembly; drawers for config the API cannot write.
      Go forward selected (dead default footgun). Set one before a
      client build.
    - Switch Frame: live playground had **neither** Iframe nor
-     Main page selected (dead default, same class as Go Back).
-     min/max 0/0. Set one before a client build.
+     Main page selected (docs say **Main frame**; live drawer
+     may say **Main page** — same radio). Dead default, same
+     class as Go Back. Choosing Iframe requires the iframe's
+     selector (`iframe` or `#mce_0_ifr` on the-internet), not
+     just the radio. min/max 0/0. Set one before a client
+     build. Pattern 8 hard case: Iframe selected + selector,
+     then Insert Text `body#tinymce`.
    - Browser Alert (palette label; search "dialog" — there is no
      Accept/Dismiss Dialog card): optional **Prompt response**
      textarea; min/max 0/0. No explicit Accept vs Dismiss control.
@@ -141,20 +203,32 @@ assembly; drawers for config the API cannot write.
      select+click.
    - Send Notification: **Subject** + **Email content** + min/max.
      Sends to the signed-in account email — **no To: field**.
+     Subject/body from `{id, name}` tokens via **My references**.
+     Loop-exit digest (After Repeat → email) is the cheap "run finished"
+     signal; the same block is also a per-row alert inside the loop.
    - Upload File: tip "Make sure to initiate the upload by clicking the 'Upload' button in the previous step."
-     File source radios From file URL / From folder path on your
-     computer — live default **neither** selected. min/max.
+     File source radios **From file URL** / **From folder path on your computer**
+     — live default **neither** selected. Detect errors **names the node** if File source is unset. **From folder path on your computer**
+     is the Agent machine, not the creator browser. Prefer **From file URL**
+     for a portable demo (`https://raw.githubusercontent.com/github/gitignore/main/README.md`).
+     A file column/variable can also be referenced via From file URL
+     (Upload FAQ). Save File cannot write a file column.
+     Click the file input (`#file-upload`) in the
+     previous step. min/max.
    - Record Date: **Select date format** dropdown (nothing selected
-     live). No min/max.
+     live). No min/max. Run stamp: Calendar date, MM/DD/YYYY, **Today**
+     → Date Added column (Pattern 17).
    - Save from Clipboard: **Save copied text to** table/variable
      picker. No min/max.
    - Save Page URL: **Save current page URL to** table/variable
      picker. No min/max.
    - Quit Browser: **Force quit** checkbox (unchecked live). No min/max.
    - Recoverable failure → `try` + body; `catch` and `after_try` **both off `try`**.
-     Catch is a **dead-end on purpose** (no outgoing edge, no drawer).
+     Catch is a **dead-end on purpose** in the Pattern 4 proof (no outgoing edge, no drawer).
      After Try-Catch is the continue path (also no drawer). The proof
      is a Log after After Try-Catch, not a catch→log wire.
+     Outreach (Pattern 13): Start Try-Catch drawer **"Save error message to"** a
+     table column (`Error`); catch may **rejoin** the same Delay as the happy path.
      Start Try-Catch may have at most THREE connections (one body + On Catch +
      After Try-Catch). A Write JS sibling off Try is a fourth wire and fails
      Detect errors: "The Start Try-Catch building block can have up to three
@@ -162,16 +236,52 @@ assembly; drawers for config the API cannot write.
      → Scrape scope (try) → (Scroll rounds | catch | after_try).
    - Browserless API → `update_or_configure_api` → `math` / `format_data` / `regex` →
      `log` / `email` / `ask_chatgpt`. HTTP must **SAVE RESPONSE** or
-     the call is a no-op. Live Pattern 5 left body / nested path /
-     status **all empty** — Detect errors can stay quiet while the
-     API result is discarded. Math writes back to `fx_x100`
-     (Multiply × 2.5). Ask ChatGPT one-word HIGH or LOW →
-     `gpt_answer`. Pick refs with **V / My references**.
+     the call is a no-op. SAVE RESPONSE has **three independent slots**:
+     body / nested record paths / **Save response status code**.
+     Filling **only** the status-code slot is intentional (Pattern 19
+     link-rot checker) — unlike Pattern 5's accidental no-op (body +
+     nested + status **all empty**). Secrets in headers are
+     `Bearer {id, name}` variable tokens — never a literal. Live
+     Pattern 5 left body / nested path / status **all empty** —
+     Detect errors can stay quiet while the API result is discarded.
+     Math writes back to `fx_x100` (Multiply × 2.5). Ask ChatGPT
+     one-word HIGH or LOW → `gpt_answer`. Pick refs with **V / My
+     references**.
    - Custom / npm / Playwright / secrets → `write_js` with `// @zw-run-locally`.
    - Sub-bot (agent ≥ 1.1.75) → `run_taskbot`. **Wait until the TaskBot finishes** CHECKED = sync; uncheck =
      fire-and-forget.
      No min/max delay. Older fire-and-forget → HTTP to webhook.
-   - Insert Text or Data: **Use spintax** is CHECKED by default.
+     **Honest hole:** Run TaskBot, cookies/proxies/Launch Browser, and
+     file columns / Upload File / Save File are **absent from this
+     client's live bots**. Catalog fields remain; do not invent a
+     client recipe. Live substitute = Pattern 17 (two-phase, no
+     `run_taskbot`). A variable-only bot can look child-shaped; nothing
+     calls it.
+   - Grid / feed cards → Standard loop mode **"Count elements matching selector"**
+     + **Lead selector** (Pattern 16 `section main a[href*="/p"]`;
+     Pattern 17 `a[href*=products]` + Save WE
+     `a[href*=products] >> nth={loop_index,0}`). Or Standard
+     Fixed N + Auto-scroll ON. **Prefer regular CSS selectors unless XPath is absolutely necessary.**
+   - Save WE **Custom attribute** `src` (dialog `img`) feeds a vision HTTP body
+     (Pattern 16). Nested SAVE RESPONSE path `choices[0].message.content` — the
+     JSON path can become the variable name. Secrets are `Bearer {id, name}`.
+   - Destructive nodes (Follow / Post / Send / Delete-all test sub-flow) left
+     **deactivated** = production hygiene (Patterns 14, 16). Class `deactive`.
+   - Click: **Perform right-click** and **Use human-like clicking**
+     (both often OFF). Pattern 4 left-click, human-like off.
+   - Insert Text or Data: **Use spintax** is CHECKED by default
+     (independent of typing speed). When **Insert instantly** is
+     unchecked, the typing-speed slider **PRO → VERY SLOW** is
+     human-like. Selector is the **INPUT**, not the label (Pattern 8:
+     `#username` / `#password`). Number inputs still use Insert
+     Text (`input[type=number]`). Iframe: Switch Frame first
+     (selector `iframe` or `#mce_0_ifr`), then Insert Text on
+     `body#tinymce`. Shadow: inspect
+     slotted light DOM vs shadowRoot (`span[slot="my-text"]`
+     is light DOM). Do not always Write JS for /shadowdom.
+   - Select Web Dropdown: needs the `<select>` selector **AND** the
+     option text (Pattern 8: `#dropdown` + `Option 2`). Custom
+     div/button menus are Click + Click, not this block.
    - Raise Error: optional message (live default "A custom error was raised.");
      **Mark this TaskBot run as failed in the run report**
      and **Include this error in the error report** both unchecked live.
@@ -182,8 +292,21 @@ assembly; drawers for config the API cannot write.
      outside ZeroWork. CSV import creates a native table.
    - REST: `POST /data_group/` `{name, type:'NATIVE', columns:[{colName}…], connector_id}`.
      Tables are **per-bot** — never reuse another bot's table id.
-   - Overwrite-each-run → `delete_table_data` (all rows) **before** the Standard loop.
-   - Dedup → `remove_duplicate_rows` **after** the loop.
+   - Overwrite-each-run → `delete_table_data` (all rows) **before** the Standard loop
+     (**truncate-then-refill**, Pattern 17). On a Sheets-linked table this
+     clears the spreadsheet.
+   - Consume a Dynamic queue → `delete_table_data` mode **"Delete current row in a loop"**
+     after a successful send (Pattern 13). Blank-row guard: Start Condition
+     **NOT_EXISTS** on the URL column → same delete mode.
+   - Dedup → `remove_duplicate_rows` **after** the loop (key column; Preserve newest).
+   - Driver-table gating → an `isActive` column + Start Condition EQUALS `true`
+     (Pattern 15). Enable/disable targets from the table, not the graph.
+   - A Sheets-backed table can exist **without a Sheets *block*** — Sheets is a
+     **table property** (sidebar Tables → green Sheets icon; kebab: Edit
+     Google Sheets link / Remove from this TaskBot / Delete table / About
+     this table). Ordinary save / update / delete_table_data write through
+     and sync. A bot can mix plain native tables and Sheets-linked tables.
+     Loop either like a native table (Pattern 18). Never bake a Sheets URL.
 4. **Assemble (REST-first)** ([rest-api.md](references/rest-api.md)):
    - Create bot: `POST /connector/` `{name}` (or `/workflows` → "New TaskBot").
    - `POST /node/` × N with **canonical** `type` strings ([node-types.md](references/node-types.md));
@@ -247,7 +370,15 @@ assembly; drawers for config the API cannot write.
    will say "Your Desktop Agent is offline" even when `localhost:9990`
    answers — the creator page cannot `fetch` http://127.0.0.1 from HTTPS
    and has no native-host pairing. No REST trigger. Scheduler / webhook
-   need a **linked** agent + awake machine.
+   need a **linked** agent + awake machine. Scheduler UI: Frequency
+   Every day + Interval + unit Hours + N + optional "Delay hour-based
+   start by X minutes" + optional time range + Timezone; REMOVE /
+   RESCHEDULE; cadence and TZ are per-bot; no catch-up. Webhook UI:
+   one `https://webhook.zerowork.io/trigger/<token>` URL;
+   active/inactive toggle; copy; delete=rotate. A bot can have a
+   webhook configured but inactive. No method picker (inbound POST).
+   Deactivated nodes stay wired (react-flow class `deactive`) — the
+   canvas lies about what runs.
 8. **Verify** — `GET /execution/` (`result`, `errors_count`, `run_duration`)
    is not enough: Try-Catch can swallow a login/scrape throw and still
    report success / 0 errors. Also `GET /data_group/<id>/item/get_count/`
@@ -260,8 +391,16 @@ assembly; drawers for config the API cannot write.
 
 Worked sketches for (i) paginated list scrape, (ii) form + conditions +
 try-catch, (iii) browserless HTTP → transform → Log/Notify, (iv) LinkedIn-
-style virtualized feed, (v) X/Twitter infinite-scroll feed live in
-[build-patterns.md](references/build-patterns.md) (Patterns 2, 4, 5, 6, 7).
+style virtualized feed, (v) X/Twitter infinite-scroll feed, (vi) form
+input / select / upload plus number / iframe / checkbox / shadow
+hard cases, (vii) tabs + nested loops, (viii) scheduled Dynamic
+scrape + keyword email, (ix) webhook + HTTP work queue + branch
+rejoin, (x) large branched form + webhook (possibly inactive), (xi) LinkedIn outreach DM + daily cap,
+(xii) Dynamic enrich RUN LIST, (xiii) Facebook group scrape + criteria reply,
+(xiv) Instagram hashtag engage + vision comment,
+(xv) two-phase collect then Dynamic enrich (no Run TaskBot),
+(xvi) Sheets as a table property, (xvii) HTTP status-only link check live in
+[build-patterns.md](references/build-patterns.md) (Patterns 2, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19).
 
 ## Creator editor automation — core loop
 
@@ -269,7 +408,7 @@ The creator is React + MUI + React Flow. Node/edge/table **create** is REST
 (preferred). Drawer field writes have no REST (they go over websocket) — use
 the loop below. Full selectors, event sequences, and pitfalls: **[references/creator-editor-automation.md]**. Copyable drag helper: **[templates/zw_drag.py]**.
 
-1. **Add block** — synthetic HTML5 drag: palette card (`[draggable=true]`, match by innerText) → `dragstart` with `DataTransfer.setData('application/reactflow', '<type>')` (verified: `open_link`) → drop on `div.invisible-drop`. Each drop auto-opens the new block's config drawer.
+1. **Add block** — synthetic HTML5 drag: palette card (`[draggable=true]`, match by innerText) → `dragstart` with `DataTransfer.setData('application/reactflow', '<type>')` (verified: `open_link`) → drop on `div.invisible-drop`. Each drop auto-opens the new block's config drawer. Palette-drop quirk: drag from the right panel can leave a pending ghost; the next canvas click places the node and opens the drawer.
 2. **Configure** — drawer opens CENTER-screen (not right side). Fill via React prototype value-setters + `input`/`change` events when you have page JS; otherwise the cua-driver loop in [creator-editor-automation.md](references/creator-editor-automation.md). Write JavaScript / Monaco: page JS `monaco.editor.getEditors()[0].getModel().setValue(code)` — UIA `set_value` does not work. Leave **Run locally** unchecked for in-page harvest. Click SAVE (button text 'SAVE', toast = "Updated successfully").
 3. **Connect blocks (trusted input ONLY)** — React Flow's d3-drag ignores synthetic events. Must (a) `switch_tab(targetId)` so the editor tab is VISIBLE (trusted CDP input fails on hidden tabs), then (b) CDP `Input.dispatchMouseEvent` drag: source `.react-flow__handle-bottom` → target `.react-flow__handle-top`. Unconnected blocks fail validation ("more than one starting building block"); edges must run top-to-bottom / left-to-right.
 4. **Auto-align** — bottom-left control ("Auto-align top to bottom", a react-flow controls button) fixes messy node layouts in one click. Prefer it over dragging nodes. Do it **before** placing sticky notes — top-to-bottom auto-align yanks notes into a row. Skip it once notes sit next to their nodes.

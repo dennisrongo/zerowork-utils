@@ -44,6 +44,10 @@ are catchable by Try-Catch. `console.log` is **not** persisted — use
 Old unprefixed `log()`, `delay()`, `setRef()`, `getRef()`, `activePage`,
 `taskbotContext` still work. Prefer `zw.*` and
 `zw.browserContext.getActivePage()` / `getContext()`.
+Client scrapers (Pattern 15) use `setRef({..., appendIndex: i})` to append N rows
+in one node, persist an `index` cursor across scroll passes, plus `await log({message})`
+and `await delay({min,max})` (official unit ms). Resolve `ref_id` via
+`zw.getTaskbotInfo()` / **My references**, never another bot's table id.
 
 `zw` also works in no-code inputs: `${…}` expressions and `$${…}` blocks
 (must `return`). See [platform-primitives.md](platform-primitives.md).
@@ -304,3 +308,8 @@ https://docs.zerowork.io/using-zerowork/using-building-blocks/write-javascript/m
   `setRef`/`appendIndex` in one block (Pattern 3).
 - HTTP + transform + notify → Send HTTP / math / ChatGPT / Log (no JS).
 - Need Playwright routes, npm, or device secrets → Write JS, run locally.
+- Do **not** hard-code tableRefId or a test URL in Write JS. Resolve
+  ref_id via zw.getTaskbotInfo() / **My references**, and use the
+  URL you just saved (getRef), not a leftover debug string.
+- Values interpolated into a hand-written JSON HTTP body: strip double quotes
+  so the JSON stays valid (Pattern 19).

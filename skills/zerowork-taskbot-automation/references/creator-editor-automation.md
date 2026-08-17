@@ -25,6 +25,11 @@ item.dispatchEvent(mk('dragend',   r.x+300, r.y+200));
 - The palette's own dragstart sets `application/reactflow` = snake_case type. Verified: `open_link`. Extract others by intercepting `DataTransfer.prototype.setData` during a synthetic dragstart on each palette card.
 - The app's drop handler lives on `div.invisible-drop` (class literally `invisible-drop`), NOT the standard react-flow wrapper.
 - Each successful drop: creates the node AND auto-opens its config drawer. Drop coordinates influence initial node position but NOT execution order (edges do).
+- Palette-drop quirk (live, Demo - Form Input Select Upload):
+  drag from the right panel can leave a **pending ghost**; the
+  next canvas click places the node and opens the drawer. Do
+  not treat the ghost as a failed drop — click the canvas once
+  more.
 - IMPORTANT ORDERING BUG: the drop→configure→SAVE pattern configures the NEWEST node. If you re-drop a block to reopen its drawer and then delete "the duplicate", you may delete the configured one. Sequence: re-drop → configure new → SAVE → delete the OLD node id.
 
 ## Opening an existing node's drawer

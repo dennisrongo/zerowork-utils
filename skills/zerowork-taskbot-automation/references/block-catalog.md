@@ -71,7 +71,8 @@ options** collapsible + min/max sec + **V / T** insert helpers.
   checkbox; min/max sec delay after the action.
 - **Wiring / companions:** Typical starting block. Single-out. New tab
   stays in the background; add Switch or Close Tab if a human needs to
-  watch, or enable Bring pages to front.
+  watch. **Bring Pages to Front** is a **run setting** (not a block)
+  for watching those new tabs.
 - **When to use vs adjacent:** First navigation, or reopen after Quit
   Browser. Use Launch Browser first when you must override engine / sticky
   / proxy / bypass *before* any URL. Use Write JS
@@ -110,8 +111,11 @@ options** collapsible + min/max sec + **V / T** insert helpers.
   Frame). Not for history (Go Back or Forward).
 - **Gotchas:** Tab number / latest / prev / next follow **creation order**,
   not visual order after a human drag. In "regular browser" / sticky-shared
-  sessions prefer **URL matching**. Closing the active tab activates the
-  next-right, else next-left.
+  sessions prefer **URL matching**. Partial URL can over-match
+  (`/windows` also matches `/windows/new`) — be specific (full URL or
+  tighter path). Closing the active tab activates the
+  next-right, else next-left. Tab-number switching (Tab **2** then
+  back to Tab **1**) exists on live crawls — still prefer URL match.
 
 ## Go Back or Forward (`navigate`)
 
@@ -145,6 +149,9 @@ options** collapsible + min/max sec + **V / T** insert helpers.
 - **Wiring / companions:** Single-out. Usually the first block when
   settings matter. Pair with Quit Browser to tear down mid-flow. Overrides
   become the new runtime defaults until another Launch Browser reverses them.
+  **Honest hole:** cookies / proxies / Launch Browser are **absent from
+  this client's live bots**. Catalog fields remain; do not invent a
+  client recipe.
 - **When to use vs adjacent:** Need sticky / proxy / bypass / scripts
   without Write JS. Open Link alone is enough when defaults are fine.
   `zw.browserContext.launch()` for the full Playwright surface.
@@ -181,19 +188,24 @@ options** collapsible + min/max sec + **V / T** insert helpers.
 - **Official:** https://docs.zerowork.io/using-zerowork/using-building-blocks/switch-frame.md
 - **Purpose:** Enter an iframe (or return to the main frame) so later
   selector blocks see that document.
-- **Config / drawer fields:** radios **Iframe** / **Main page**. Live
-  playground had **neither** selected (dead default, same class as
-  Go Back — Detect errors may stay quiet; set one before a client
-  build). min/max **0/0**. Choosing Iframe reveals the iframe
-  selector.
+- **Config / drawer fields:** radios **Iframe** / **Main page**. Official
+  docs say **Main frame**; live drawer may say **Main page** (same
+  radio). Live playground had **neither** selected (dead default, same
+  class as Go Back — Detect errors may stay quiet; set one before a
+  client build). min/max **0/0**. Choosing Iframe reveals the iframe
+  selector — docs require that selector, not just the Iframe radio
+  (`iframe` or `#mce_0_ifr` on the-internet).
 - **Wiring / companions:** Single-out. All following web blocks stay in
   that frame until Main frame / Open Link / Switch-or-Close Tab (those
   **clear** the frame). Nested iframes = chained Switch Frame blocks.
 - **When to use vs adjacent:** Iframes only. A "selector not found" inside
   an embedded form/checkout/recaptcha is usually a missing Switch Frame.
-- **Gotchas:** Unset radios (neither Iframe nor Main page selected) is
-  a dead default — same class as Go Back. Missing iframe → error,
-  stop. Increase selector timeout on in-frame Click/Save/Hover.
+  Pattern 8 hard case: Switch Frame (Iframe selected, selector
+  `iframe` or `#mce_0_ifr`) then Insert Text `body#tinymce` on
+  https://the-internet.herokuapp.com/iframe.
+- **Gotchas:** Unset radios (neither Iframe nor Main page / Main frame
+  selected) is a dead default — same class as Go Back. Missing iframe
+  → error, stop. Increase selector timeout on in-frame Click/Save/Hover.
   Nested: you must walk each level.
 
 ## Browser Alert (`accept_dialog`)
@@ -223,13 +235,16 @@ options** collapsible + min/max sec + **V / T** insert helpers.
 - **Purpose:** Click a button, link, custom dropdown, "Next", upload
   control, etc.
 - **Config / drawer fields:** textarea CSS/XPath; **skip if not found**;
-  **open in new tab**; min/max; selector timeout in Selector Options.
+  **open in new tab**; **Perform right-click**; **Use human-like clicking**
+  (both often OFF); min/max; selector timeout in Selector Options.
 - **Wiring / companions:** Single-out. Pair with Check Web Element when
   the target is optional. For file upload: Click the control, then Upload
   File. For download: Click, then Save File (from download action).
 - **When to use vs adjacent:** Any clickable. Select Web Dropdown **only**
   if the control is a real `<select>`. Hover first if the target appears
-  on hover.
+  on hover. Native checkboxes are Clicks, not Insert Text (Pattern 8
+  `#checkboxes input:nth-of-type(1)` on
+  https://the-internet.herokuapp.com/checkboxes).
 - **Gotchas:** Prove uniqueness with `querySelectorAll`. Custom-styled
   "dropdowns" (`div`/`button`) are Clicks, not Select. First-letters-cut
   on a following Insert Text → Click the field first.
@@ -237,6 +252,9 @@ options** collapsible + min/max sec + **V / T** insert helpers.
   error (Pattern 4 uses `definitely-not-present-element` on
   purpose). Skip-if-not-found **on** swallows the miss without
   entering catch. Live Pattern 4: left click, human-like **off**.
+  Pattern 8 checkbox: Click `#checkboxes input:nth-of-type(1)`
+  on https://the-internet.herokuapp.com/checkboxes (native
+  checkbox is a Click, not Insert Text).
 
 ## Check Web Element (`check`) — branches `element_present` / `element_absent`
 
@@ -253,7 +271,11 @@ options** collapsible + min/max sec + **V / T** insert helpers.
 - **Wiring / companions:** **Two outgoing edges** (Found / Not Found).
   Typical: Found → continue happy path; Not Found → Send Notification /
   Break Repeat / skip. Wire those edges off `check`; Found / Not Found
-  cards have no config.
+  cards have no config. Found / Not Found can **rejoin** at a later
+  node (not only dead-end) — Pattern 11. A **dead-end** Found/Not Found
+  (no outgoing edge) = skip row. **Inverted check:** presence of a
+  waitlist `input[placeholder=Email]` means unavailable (Found is the
+  skip) — Pattern 17.
 - **When to use vs adjacent:** Presence of a **web element**. For "is this
   variable empty?" use Start/Set Condition **Data found / not found**. For
   "did the HTTP call return 200?" save status + Set Condition.
@@ -268,18 +290,24 @@ options** collapsible + min/max sec + **V / T** insert helpers.
 - **Official:** https://docs.zerowork.io/using-zerowork/using-building-blocks/save-web-element.md
 - **Purpose:** Read public page data into a table/variable.
 - **Config / drawer fields:** textarea CSS/XPath; **Save as** Text / Link
-  / **Custom attribute** (+ "Enter attribute", e.g. `title`) / HTML /
-  Image file URL; **Save to** two-step table → column; **skip if no
+  / **Custom attribute** (+ "Enter attribute", e.g. `title` or `src` on a dialog `img`) / HTML /
+  Image file URL; **Save to** two-step table → column **or Variables**
+  ("Save to: Variables"); **skip if no
   element is found**; min/max.
 - **Wiring / companions:** Single-out. Two first-class modes below.
 - **When to use vs adjacent:** DOM text/attrs. Current URL → Save Page
   URL. Files → Save File. Clipboard-only sites → Save from Clipboard.
 - **Gotchas:** Without `{loop_index}` a list Save always writes the
   **first** match. CSS `:nth-of-type({loop_index})` breaks on grid items
-  under different parents — use XPath
-  `(//article[contains(@class,"product_pod")])[{loop_index}]//h3/a`.
+  under different parents — that is a `:nth-of-type` gotcha. The fix
+  is CSS `>> nth={loop_index,1}` (or `>> nth={loop_index}` or live
+  `>> nth={loop_index,0}`) / a
+  correct `:nth-child({loop_index})` on the repeating `li`
+  (`ol.row > li:nth-child({loop_index}) h3 a`), **not** XPath.
+  **Prefer regular CSS selectors unless XPath is absolutely necessary.**
   Skip-if-not-found also prevents "continue until no element" from
-  ending the loop.
+  ending the loop (swallows the end condition — then you need
+  auto-scroll or Break).
 
 ### Save Lists mode
 
@@ -323,9 +351,12 @@ options** collapsible + min/max sec + **V / T** insert helpers.
 - **Config / drawer fields:** **Content** textarea (`{id,name}` / `${}` /
   spintax); **Use spintax** CHECKED by default; **Don't press Enter on
   line breaks**; optional selector; typing-speed slider **PRO / FAST /
-  AVERAGE / SLOW / VERY SLOW** (~65-90 wpm at FAST); **Insert instantly**
-  checkbox (paste; selector required when on); min/max; **Encrypt
-  content** (password — irreversible; delete and re-enter to change).
+  AVERAGE / SLOW / VERY SLOW** (~65-90 wpm at FAST) — visible and
+  load-bearing when **Insert instantly** is unchecked (human-like;
+  Pattern 11). **Use spintax** is independent of the slider.
+  **Insert instantly** checkbox (paste; selector required when on);
+  min/max; **Encrypt content** (password — irreversible; delete and
+  re-enter to change).
 - **Wiring / companions:** Single-out. Click the field first if the site
   swallows leading keystrokes. Pair with Keyboard Enter to submit if
   no-Enter is on.
@@ -335,7 +366,21 @@ options** collapsible + min/max sec + **V / T** insert helpers.
 - **Gotchas:** Instant-on → selector **required**. Instant-off → selector
   optional (types at caret; Wikipedia/Google often focus search). First
   letters cut off → Click first, slower speed, or Delay. Table ref empty
-  → not in a Dynamic loop.
+  → not in a Dynamic loop. Selector is the **INPUT**, not the label
+  (Pattern 8: `#username` / `#password` on the-internet.herokuapp.com, not a client form).
+  Number inputs still use Insert Text (`input[type=number]`). Iframe:
+  Switch Frame first, then Insert Text on the inner document (`body#tinymce`).
+  Shadow DOM (Pattern 8 /shadowdom): inspect whether the target is
+  slotted light DOM vs inside shadowRoot. On
+  https://the-internet.herokuapp.com/shadowdom, `<my-paragraph>`'s
+  shadowRoot only contains `<slot name="my-text">`. The visible
+  text lives in the LIGHT DOM as `<span slot="my-text">`
+  (`span[slot="my-text"]`). A
+  plain CSS selector reaches it — do **not** always Write JS
+  for /shadowdom. If a future run shows no text change (span
+  is not an input), then Write JS on
+  `document.querySelector('my-paragraph').shadowRoot`
+  (browser, not Run locally).
 
 ## Hover Web Element (`hover`)
 
@@ -361,7 +406,8 @@ options** collapsible + min/max sec + **V / T** insert helpers.
 - **When to use vs adjacent:** Real `<select>` only. Custom `div`/`button`
   "dropdowns" → Click (open) + Click (option), or Keyboard.
 - **Gotchas:** Wrong tag = silent failure / not-found. Option can be a
-  variable/table ref.
+  variable/table ref. Needs the `<select>` selector **AND** the option text
+  (Pattern 8: `#dropdown` + `Option 2`).
 
 ## Keyboard Action (`keyboard`)
 
@@ -372,14 +418,14 @@ options** collapsible + min/max sec + **V / T** insert helpers.
 - **Wiring / companions:** Single-out. Focus the target first (Click or
   Insert). Tab × N + Enter can replace brittle selectors on simple forms.
 - **When to use vs adjacent:** Shortcuts, dismiss popups (Escape), reload
-  (Meta+R), scroll fallback (Space / ArrowDown), form Tab-through. Long
+  (Meta+R), scroll fallback (Space / ArrowDown), form Tab-through. Keyboard **Space** also forces lazy LinkedIn sections (Pattern 14). Keyboard Enter sends a Facebook Thread composer DM (Pattern 15 — no submit button). Long
   text → Insert Text. Native browser chrome (Ctrl+P print, Ctrl+F find,
   Cmd+S save-as, maximize) **does not work**.
-- **Gotchas:** Shift+Tab order is Shift **then** Tab. Common-problem page:
-  nothing happens = no focus, or the site eats keys. Not a substitute for
-  Click on custom widgets. Empty key field can pass Detect errors but
-  the scrape still fails — Page down to load more must be **PageDown**
-  (or End).
+- **Gotchas:** Shift+Tab order is Shift **then** Tab. Tab twice = **two separate Keyboard blocks** (one block can look like a shortcut).
+  Common-problem page: nothing happens = no focus, or the site eats
+  keys. Not a substitute for Click on custom widgets. Empty key field
+  can pass Detect errors but the scrape still fails — Page down to
+  load more must be **PageDown** (or End).
 
 ---
 
@@ -404,14 +450,17 @@ options** collapsible + min/max sec + **V / T** insert helpers.
     contain; Data found (not empty) / Data not found (empty); Longer than /
     Shorter than (char length); Before (Date) / After (Date) + **days
     shift** (pos or neg); Is a valid number / Is not a valid number;
-    **Else**.
+    **ELSE** ("if no other condition is met"). Live client drawers also expose **Contains keywords**
+    (comma-separated tokens) as a comparison type — Pattern 10 brand
+    filter. Pick the Start Condition reference via **My references**.
 - **Wiring / companions:** Start Condition is **branch-capable** (N Set
   Condition blocks off it). Each Set Condition is **single-out**. Chain
-  another Start/Set pair for AND-across-fields. Always include **Else**
-  if you need a fallback.
+  another Start/Set pair for AND-across-fields. Always include **ELSE** ("if no other condition is met")
+  if you need a fallback. Message-cap (Pattern 13): EQUALS `{id, name: MessageCount}` -> Break Repeat; ELSE continues.
 - **When to use vs adjacent:** Data/variable tests. Web-element presence
   → Check Web Element. Regex true/false → Apply Regex "Check if pattern
-  matches" then condition on the result.
+  matches" then condition on the result. Driver-table gating: an `isActive`
+  column + EQUALS `true` (Pattern 15) enables/disables targets from the table.
 - **Gotchas:** Numeric `<` `>` throw on non-numeric strings (`TEST123 > 50`
   errors; `51.77 > 50` is fine). Sanitize first (math **Remove format**,
   or regex). Date formats on both sides **must match**. Deactivating a
@@ -433,10 +482,15 @@ options** collapsible + min/max sec + **V / T** insert helpers.
 - **Config / drawer fields:** Loop-type radios Standard (pre-selected) vs
   Dynamic. Standard sub-modes: **Fixed repetitions** (INPUT placeholder
   `Enter number of repetitions` — not a textarea); **Continue until no
-  element is found**; **Count elements** matching a lead selector.
+  element is found**; **Count elements matching selector** + **Lead selector** (Pattern 16 `section main a[href*="/p"]`; Pattern 17 `a[href*=products]` + Save WE `a[href*=products] >> nth={loop_index,0}`).
   Optional **Start from** (element/row number). **Auto-scroll** checkbox.
-  **Auto-continue from last row or element** (resume across runs). Sheets
-  additional option: write-batch size (default 50).
+  **Auto-continue from last row or element** (resume across runs).
+  Dynamic extras: **Newest rows first (reverse order)** checkbox;
+  optional **Start from** row; optional **repetition limit**. Bind
+  the existing table via **My references** — dropdown **labels can
+  be stale** (hidden numeric ref id is truth); never paste another
+  bot's table id. Sheets additional option: write-batch size
+  (default 50).
 - **Wiring / companions:** **Branch-capable**. Output 1 = loop body.
   Output 2 = **After Repeat** (must come off this node). MAY have multiple
   outgoing edges. Body includes every block until After Repeat / end.
@@ -466,7 +520,8 @@ options** collapsible + min/max sec + **V / T** insert helpers.
 
 - **Official:** https://docs.zerowork.io/using-zerowork/using-building-blocks/after-repeat.md
 - **Purpose:** Run once after a loop finishes (notify, Click Next, start
-  a second independent loop in the same bot).
+  a second independent loop in the same bot — Pattern 17 phase-2 Dynamic,
+  or a loop-exit email digest).
 - **Config / drawer fields:** None (flow structure).
 - **Wiring / companions:** **Must be wired directly off Start Repeat**
   (its second output). Validator: "must be preceded by a single Start
@@ -514,6 +569,10 @@ options** collapsible + min/max sec + **V / T** insert helpers.
 - **Gotchas:** Recursion A→B→A is rejected. Wait-off: child errors do
   **not** surface here. Stopping a parent stops wait-on children (and
   their children). No depth cap besides recursion.
+  **Honest hole:** this client's live bots have **zero** `run_taskbot`
+  nodes. Live substitute = Pattern 17 (two-phase collect then Dynamic
+  enrich). Catalog fields remain; do not invent a client recipe. A
+  variable-only bot can look child-shaped; nothing calls it.
 
 ## Start Try-Catch (`try`), After Try-Catch (`after_try`), On Catch Error (`catch`)
 
@@ -521,7 +580,8 @@ options** collapsible + min/max sec + **V / T** insert helpers.
 - **Purpose:** Swallow a step failure and continue. Body after `try` is
   the protected scope. On error, jump to `catch`. After success **or**
   catch, continue at `after_try`.
-- **Config / drawer fields:** Opener may be empty; companions are structure.
+- **Config / drawer fields:** Opener may include **"Save error message to"** a table column (e.g. `Error`)
+  so the failing row keeps the exception text (Pattern 13 outreach).
   Catch and After Try-Catch have **no drawer** — select+click often
   opens nothing. That is expected.
 - **Wiring / companions:** `catch` AND `after_try` **both wire directly
@@ -532,8 +592,9 @@ options** collapsible + min/max sec + **V / T** insert helpers.
   connections...". Valid JS demo: Wait for timeline → Harvest while
   scroll → Scrape scope (try) → (Scroll rounds | catch | after_try).
   Verified: failing click with try-catch → Success/0 errors; without →
-  run error. Catch is a **dead-end on purpose** (no outgoing edge).
-  Do not wire `catch → log`. The continue path is `try → after_try → Log`.
+  run error. Catch is a **dead-end on purpose** in the Pattern 4 proof (no outgoing edge).
+  Do not wire `catch → log` for that proof. The continue path is `try → after_try → Log`.
+  Outreach (Pattern 13) may let catch **rejoin** the same Delay as the happy path.
 - **When to use vs adjacent:** Recoverable step failures. Abort Run for
   unrecoverable. Raise Error / `throw` to **enter** a catch on purpose.
 - **Gotchas:** Start-failure (outdated agent, invalid setup, more than
@@ -592,6 +653,9 @@ options** collapsible + min/max sec + **V / T** insert helpers.
   increment. Format / Regex / Split to transform first.
 - **Gotchas:** Table column update outside a Dynamic loop does nothing
   useful ("no data is being pulled"). Empty value is a valid clear.
+  Doubles as a **cross-table cell copier**: dest := `{id, name: Section}`
+  from another table (via **My references**). Reset-to-empty at the top
+  of an iteration so a stale value cannot leak into a selector.
 
 ## Number Operations (`math`)
 
@@ -605,7 +669,7 @@ options** collapsible + min/max sec + **V / T** insert helpers.
   `1000000.23`; mixed grouping errors). Number field + number-to-operate-on
   (literal or ref); save-to.
 - **Wiring / companions:** Single-out. Increment a counter variable each
-  loop; Remove format **before** numeric Set Condition.
+  loop (Pattern 13 message-cap: **Add** 1 onto `{id, name: CurrentMessageCount}`); Remove format **before** numeric Set Condition.
 - **When to use vs adjacent:** Numbers. Format Data for text. Regex for
   extract-then-math.
 - **Gotchas:** Empty operand → skip, continue. Non-numeric input to any
@@ -663,14 +727,15 @@ options** collapsible + min/max sec + **V / T** insert helpers.
   strings. Number Remove format for thousands-separators.
 - **Gotchas:** Empty input → no-op. Invalid regex → error, stop/break.
   Without `g`, extract/replace hit the first match only. Prefer the V
-  picker for refs.
+  picker for refs. A **deactivated** Extract-matches twin may sit beside
+  live Write JS as documentation (`deactive`) — Pattern 17.
 
 ## Remove Duplicates (`remove_duplicate_rows`)
 
 - **Official:** https://docs.zerowork.io/using-zerowork/using-building-blocks/remove-duplicates.md
 - **Purpose:** Batch-dedup a table. Default keeps **oldest** rows.
-- **Config / drawer fields:** table picker; column (specify one — faster);
-  **Preserve newest rows** (native tables only, not Sheets). File columns
+- **Config / drawer fields:** table picker; **key column** (specify one — faster);
+  **Preserve newest** rows (native tables only, not Sheets). File columns
   are ignored in the comparison.
 - **Wiring / companions:** Single-out. Place **after** the scrape loop,
   never inside it (batch; inside a loop it still runs only once).
@@ -687,13 +752,18 @@ options** collapsible + min/max sec + **V / T** insert helpers.
 - **Purpose:** Delete **all rows** (overwrite-before-scrape) or **one
   row** (current Dynamic-loop row, e.g. disqualified lead).
 - **Config / drawer fields:** Live playground empty default shows only
-  **Delete from** table/variable picker. Official scope: all rows vs
-  one (current Dynamic-loop) row.
+  **Delete from** table/variable picker. Official / live modes: **Delete all rows** vs
+  **Delete current row in a loop** (current Dynamic-loop row — queue shrinks
+  so re-runs never re-message; Pattern 13).
 - **Wiring / companions:** All-rows: **before** the Standard loop. One-row:
   inside Dynamic loop under a Set Condition.
 - **When to use vs adjacent:** Wipe or prune. Clear a variable = Update
   Data with empty value, not this.
 - **Gotchas:** All-rows is permanent. Export CSV first if you might care.
+  **Truncate-then-refill** (Delete all rows first, Pattern 17) vs
+  **Delete current row in a loop** (Pattern 13 queue). On a Sheets-linked
+  table, Delete all rows clears the spreadsheet ("Delete Spreadsheet
+  Data" is just this mode on the linked table).
 
 ---
 
@@ -727,10 +797,13 @@ options** collapsible + min/max sec + **V / T** insert helpers.
 - **Config / drawer fields:** **Subject**; **Email content**
   (plaintext and/or minified HTML); min/max. **No To: field.** Sends
   to the signed-in account email (drawer copy says the email will be
-  sent there). Not an arbitrary recipient. Palette card is **Send
+  sent there). Not an arbitrary recipient. Subject/body accept
+  `{id, name}` tokens via **My references**. Palette card is **Send
   Notification** (EXTERNAL), not "Email" / "Send Email".
 - **Wiring / companions:** Single-out. After Check Not-Found, After Repeat,
-  or a failure branch.
+  or a failure branch. Loop-exit digest (After Repeat → email) is the
+  cheap "run finished" signal (Pattern 17); per-row alert stays inside
+  the loop.
 - **When to use vs adjacent:** Self-alert. Other recipients → Send HTTP to
   an email API. Run-level Slack/webhook notifications are TaskBot
   Settings, not this block.
@@ -742,9 +815,13 @@ options** collapsible + min/max sec + **V / T** insert helpers.
 - **Official:** https://docs.zerowork.io/using-zerowork/using-building-blocks/apis-send-http-request.md
 - **Purpose:** Arbitrary HTTP. Browserless pipelines start here.
 - **Config / drawer fields:** Method (GET default); URL textarea
-  (`https://api.com`); HEADERS; REQUEST BODY (`{}`); SAVE RESPONSE
-  (body → table, nested **record path** becomes the column name, e.g.
-  `choices[0]['text']`); save status code; min/max.
+  (`https://api.com`); HEADERS (secrets as `Bearer {id, name}`
+  variable tokens — never a literal); REQUEST BODY (`{}`); SAVE
+  RESPONSE has **three independent slots**: body → Variables or a table;
+  **multiple Nested record path** entries, e.g.
+  `data.records[0]['fields']['Job URL']` or `choices[0]['text']`;
+  **Save response status code** → table column. Each slot is optional;
+  min/max.
 - **Wiring / companions:** Single-out. Create dest columns first. Replace
   `"` → `'` in dynamic JSON bodies (Format Replace). Condition + Break
   on status ≠ 200. Can POST to another bot's webhook.
@@ -756,7 +833,13 @@ options** collapsible + min/max sec + **V / T** insert helpers.
   math works.
   Empty **SAVE RESPONSE** (body, nested path, and status code **all empty**) = the HTTP call is a **no-op**. Detect errors can stay quiet while the API result is discarded (live Pattern 5 **footgun**,
   GET `https://api.frankfurter.app/latest?from=USD&to=GBP`, no headers,
-  no body). Fill SAVE RESPONSE or the GET is discarded.
+  no body). Fill SAVE RESPONSE or the GET is discarded. Multiple
+  Nested record paths are first-class (Pattern 11). Status-code
+  dest is optional. Filling **only** **Save response status code** is
+  intentional (Pattern 19 link-rot checker) — body and nested paths
+  empty on purpose, unlike Pattern 5's accidental no-op. **The JSON
+  path can become the variable name**
+  (Pattern 16: dest token `{id, name: choices[0].message.content}`).
 
 ## Write JavaScript (`write_js`)
 
@@ -787,7 +870,10 @@ See [write-javascript.md](write-javascript.md) for the full `zw` API.
   throws `require is not defined`. When a human is in this drawer,
   one pasteable script — do not SendInput
   ([write-javascript.md](write-javascript.md) "Authoring for a
-  human").
+  human"). Do **not** hard-code `tableRefId` or a test URL — resolve
+  via `zw.getTaskbotInfo()` / **My references**, and use the URL you
+  just saved. Strip `"` from values interpolated into a hand-written
+  JSON HTTP body so the JSON stays valid (Pattern 19).
 
 ---
 
@@ -815,14 +901,19 @@ See [write-javascript.md](write-javascript.md) for the full `zw` API.
 - **Purpose:** Feed a file chooser from a URL or a local full path.
 - **Config / drawer fields:** tip "Make sure to initiate the upload by clicking the 'Upload' button in the previous step."
   File source radios **From file URL** / **From folder path on your computer** —
-  live playground had **neither** selected. min/max.
+  live playground had **neither** selected. Detect errors **names the node** if File source is unset. min/max.
   Official examples treat the folder-path option as a **file pathname**.
 - **Wiring / companions:** **Click the upload control first**. Chooser is
   invisible during the run.
-- **When to use vs adjacent:** Page uploads. Not for stuffing a file
-  column (that's a table UI action).
-- **Gotchas:** Bypass detection blocks uploads ≳ 50 MB. Path is on **this**
-  agent machine only.
+- **When to use vs adjacent:** Page uploads. A file column/variable can
+  be referenced via **From file URL** (Upload FAQ). Save File cannot
+  write a file column (path/URL → standard column). Creating a
+  file-column value in the table UI is still a table action.
+- **Gotchas:** Bypass detection blocks uploads ≳ 50 MB. **From folder
+  path on your computer** is the **Agent machine**, not the creator browser. Prefer **From file URL** for a portable demo (`https://raw.githubusercontent.com/github/gitignore/main/README.md`). Detect errors
+  **names the node** if File source is unset. Requires a prior Click
+  on the file input (`#file-upload`). From file URL also accepts a
+  file-column / variable ref.
 
 ---
 
@@ -856,7 +947,8 @@ See [write-javascript.md](write-javascript.md) for the full `zw` API.
 - **When to use vs adjacent:** Structured dates. Write JS `Date`/`dayjs`
   for fancy timestamps.
 - **Gotchas:** Mismatched formats make Before/After wrong. 1.1.63 fixed a
-  timezone bug — keep the agent current.
+  timezone bug — keep the agent current. **insert_date as a run stamp:**
+  Calendar date, MM/DD/YYYY, **Today** → Date Added (Pattern 17).
 
 ## Take Screenshot (`screenshot`)
 
@@ -931,7 +1023,8 @@ See [write-javascript.md](write-javascript.md) for the full `zw` API.
 - **Config / drawer fields:** note text.
 - **Wiring / companions:** None.
 - **When to use vs adjacent:** Documentation on the canvas. Log is for
-  run-time messages.
+  run-time messages. On client bots sticky notes are **load-bearing**
+  (selector history, AM/PM branch intent) — not decoration.
 - **Gotchas:** Not executed. Do not POST `sticky_note` expecting a run
   step. Markdown rendering is agent ≥ 1.1.75. REST-create stays
   `"Write a note..."`; fill with
@@ -963,11 +1056,15 @@ See [write-javascript.md](write-javascript.md) for the full `zw` API.
   Activate. Per-block min/max delay (after the action). Optional
   randomize-all-delays after the graph is built.
 - **Wiring / companions:** Deactivated nodes stay in the graph and **still
-  count** for validator structure (class `deactive`, skipped at run). Skip
-  a loop = deactivate Start Repeat (continues at After Repeat). Skip try =
-  deactivate Start Try-Catch (continues at After Try-Catch).
+  count** for validator structure (class `deactive`, skipped at run). The
+  canvas **lies** about what runs — a wired Save / Write JS with
+  `deactive` is skipped. Skip a loop = deactivate Start Repeat
+  (continues at After Repeat). Skip try = deactivate Start Try-Catch
+  (continues at After Try-Catch).
 - **When to use vs adjacent:** Temporarily mute a path without deleting
-  edges. A Delay block is an explicit wait **before** the next action;
+  edges. **Destructive nodes left deactivated = production hygiene**
+  (Follow / Post / Send / Delete-all test sub-flow — Patterns 14, 16).
+  A Delay block is an explicit wait **before** the next action;
   per-block delay is **after**.
 - **Gotchas:** Deactivating a Start Condition **and** its Sets makes the
   next path **random**. Multi-select: Shift+drag or Cmd/Ctrl+click.
@@ -987,19 +1084,19 @@ Internal canvas types also include `fake` and `delete` (not user-facing).
 | Go Back or Forward | radios Go back/Go forward (live default NEITHER — dead default footgun); min/max |
 | Launch Browser | bypass bot detection, background, maximize, window size, cookies, proxy, browser engine, launch args, scripts, page visibility (tri-state), sticky/incognito |
 | Quit Browser | Force quit checkbox (unchecked live); no min/max |
-| Switch Frame | radios Iframe / Main page (live default NEITHER — dead default, same class as Go Back); min/max 0/0 |
+| Switch Frame | radios Iframe / Main page (docs: Main frame; live drawer may say Main page); iframe selector required when Iframe selected (`iframe` or `#mce_0_ifr`); live default NEITHER — dead default, same class as Go Back; min/max 0/0 |
 | Browser Alert | optional Prompt response textarea; min/max 0/0; no Accept vs Dismiss control; palette label Browser Alert |
-| Click Web Element | textarea[CSS/XPath]; skip-if-not-found cb; open-in-new-tab cb; min/max |
+| Click Web Element | textarea[CSS/XPath]; skip-if-not-found cb; open-in-new-tab cb; Perform right-click; Use human-like clicking; min/max |
 | Check Web Element | selector CSS/XPath; Selector options; must-be-visible cb; min/max; Found/Not Found are **no-drawer** markers (edge wiring, not a field) |
-| Save Web Element | textarea[CSS/XPath]; Save-as (Text / Link / Custom attribute + "Enter attribute" / HTML / Image file URL); Save-to picker; skip-if-missing cb; min/max |
-| Insert Text or Data | Content textarea; Use spintax CHECKED by default; Don't press Enter; optional selector; speed slider PRO/FAST/AVERAGE/SLOW/VERY SLOW (~65-90 wpm FAST); Insert instantly cb; min/max |
+| Save Web Element | textarea[CSS/XPath]; Save-as (Text / Link / Custom attribute + "Enter attribute" / HTML / Image file URL); Save-to table column or Variables; skip-if-missing cb; min/max |
+| Insert Text or Data | Content textarea; Use spintax CHECKED by default (independent of speed); Don't press Enter; optional selector; speed slider PRO/FAST/AVERAGE/SLOW/VERY SLOW when instant unchecked; Insert instantly cb; min/max |
 | Hover Web Element | selector + Selector options + min/max; NO must-be-visible cb |
 | Select Web Dropdown | Dropdown option; dropdown selector; Selector options; min/max |
 | Keyboard Action | key picker UI; min/max |
 | On Catch / After Try-Catch / Break Repeat / After Repeat / Found / Not Found / Abort Run | **No drawer** — select+click often opens nothing |
 | Raise Error | optional message (default "A custom error was raised."); Mark run failed in run report cb; Include in error report cb (both unchecked live) |
-| Start Repeat | Standard vs Dynamic; Fixed / Continue-until-no-element / Count-elements; repetition INPUT `Enter number of repetitions`; Auto-scroll; Start-from; Auto-continue |
-| Start / Set Condition | Start = value picker; Set = 18 operators + operand / Else |
+| Start Repeat | Standard vs Dynamic; Fixed / Continue-until-no-element / Count-elements; repetition INPUT `Enter number of repetitions`; Auto-scroll; Start-from; Auto-continue; Dynamic: Newest rows first (reverse), repetition limit, table via My references (label can be stale) |
+| Start / Set Condition | Start = value picker; Set = 18 operators + operand / ELSE ("if no other condition is met") |
 | Update Data | value textarea (empty = clear); two MUI selects; Use spintax cb |
 | Number Operations | Add/Subtract/Multiply/Divide/Remainder/Round/Round up/Round down/Random/Set decimals/Remove format; operands; save-to |
 | Format Data | Remove word / Replace / Shorten / case / Normalize URL / Trim / line breaks / smileys; input; save-to |
@@ -1009,7 +1106,7 @@ Internal canvas types also include `fake` and `delete` (not user-facing).
 | Delete Data | live empty default: only Delete from picker; official all vs one |
 | Ask ChatGPT | Model select; prompt textarea; Save answer to |
 | Send Notification | Subject; Email content; min/max; no To: field (signed-in account email) |
-| Send HTTP Request | Method; URL; HEADERS / BODY / SAVE RESPONSE; record path; status dest; min/max |
+| Send HTTP Request | Method; URL; HEADERS (Bearer {id, name}); BODY / SAVE RESPONSE three independent slots (body / nested paths / Save response status code); min/max |
 | Write JavaScript | MONACO; Run locally cb |
 | Save File | source radios; folder/path; file options; min/max |
 | Upload File | previous-step Upload-button tip; From file URL / From folder path on your computer (live NEITHER); min/max |

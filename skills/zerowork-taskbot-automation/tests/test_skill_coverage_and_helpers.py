@@ -410,6 +410,8 @@ class TestXFeedLiveCanvasRules(unittest.TestCase):
             url["selector"],
             "(//article[@data-testid='tweet'])[{loop_index}]//a[contains(@href,'/status/')]",
         )
+        self.assertIn(">> nth=", url["selector_css"])
+        self.assertIn('article[data-testid="tweet"]', url["selector_css"])
         self.assertEqual(url["save_as"], "Link")
         self.assertEqual(url["table"], "x_feed_posts")
         self.assertEqual(url["column"], "post_url")
@@ -968,6 +970,9 @@ class TestNodePlaygroundDrawerSchemas(unittest.TestCase):
         self.assertIn("dead default", frame)
         self.assertIn("Go Back", frame)
         self.assertIn("0/0", frame)
+        self.assertIn("Main frame", frame)
+        self.assertIn("Main page", frame)
+        self.assertTrue("#mce_0_ifr" in frame or "iframe" in frame)
 
     def test_upload_file_previous_step_tip(self):
         docs = self._docs()
@@ -1001,6 +1006,682 @@ class TestNodePlaygroundDrawerSchemas(unittest.TestCase):
             )
         self.assertGreater(checked, 10)
 
+
+class TestPattern8FormInputSelectUpload(unittest.TestCase):
+    """Live Demo - Form Input Select Upload rebuild rules."""
+
+    NOTE_TEXTS = (
+        "Insert Text selector is the INPUT not the label",
+        "Select needs the <select> selector AND the option text",
+        "Upload File requires a prior click on the file input",
+        "Number inputs still use Insert Text",
+        "Switch Frame first, then Insert Text targets the inner document",
+        "Shadow DOM: Insert Text often fails. Write JS on shadowRoot.",
+    )
+
+    def _docs(self):
+        refs = SKILL_ROOT / "references"
+        return {
+            "pats": (refs / "build-patterns.md").read_text(encoding="utf-8"),
+            "skill": (SKILL_ROOT / "SKILL.md").read_text(encoding="utf-8"),
+            "catalog": (refs / "block-catalog.md").read_text(encoding="utf-8"),
+            "editor": (refs / "creator-editor-automation.md").read_text(encoding="utf-8"),
+        }
+
+    def test_the_internet_urls_and_selectors(self):
+        docs = self._docs()
+        pats = docs["pats"]
+        self.assertIn("## Pattern 8", pats)
+        self.assertIn("Demo - Form Input Select Upload", pats)
+        self.assertIn("the-internet.herokuapp.com", pats)
+        self.assertIn("not a client form", pats)
+        self.assertIn("https://the-internet.herokuapp.com/login", pats)
+        self.assertIn("https://the-internet.herokuapp.com/dropdown", pats)
+        self.assertIn("https://the-internet.herokuapp.com/upload", pats)
+        self.assertIn("https://the-internet.herokuapp.com/inputs", pats)
+        self.assertIn("https://the-internet.herokuapp.com/iframe", pats)
+        self.assertIn("https://the-internet.herokuapp.com/checkboxes", pats)
+        self.assertIn("https://the-internet.herokuapp.com/shadowdom", pats)
+        self.assertIn("#checkboxes input:nth-of-type(1)", pats)
+        self.assertIn('span[slot="my-text"]', pats)
+        self.assertIn("input[type=number]", pats)
+        self.assertIn("body#tinymce", pats)
+        self.assertIn("#username", pats)
+        self.assertIn("#password", pats)
+        self.assertIn("#dropdown", pats)
+        self.assertIn("Option 2", pats)
+        self.assertIn("tomsmith", pats)
+        self.assertIn("SuperSecretPassword!", pats)
+        self.assertIn("published the-internet demo password", pats)
+        self.assertIn("public", pats.lower())
+        self.assertIn("not a secret", pats.lower())
+        self.assertIn('button[type="submit"]', pats)
+        self.assertIn("#file-upload", pats)
+        self.assertIn("#file-submit", pats)
+        for key in ("skill", "catalog"):
+            blob = docs[key]
+            self.assertIn("#username", blob)
+            self.assertIn("#password", blob)
+            self.assertIn("#dropdown", blob)
+            self.assertIn("Option 2", blob)
+            self.assertIn("the-internet.herokuapp.com", blob)
+        self.assertIn("not a client form", docs["skill"])
+        self.assertIn("Pattern 8", docs["skill"])
+
+    def test_upload_file_source_and_prior_click(self):
+        docs = self._docs()
+        for key in ("pats", "skill", "catalog"):
+            blob = docs[key]
+            self.assertIn("From file URL", blob)
+            self.assertIn("From folder path on your computer", blob)
+            self.assertIn("Agent machine", blob)
+            self.assertIn("creator browser", blob.lower())
+            self.assertIn("portable", blob.lower())
+            self.assertIn("names the node", blob)
+            self.assertIn("#file-upload", blob)
+        pats = docs["pats"]
+        self.assertIn("prior click", pats.lower())
+        self.assertIn("file input", pats.lower())
+        self.assertIn("Click the file input", docs["skill"])
+        self.assertIn("prior Click", docs["catalog"])
+        gitignore = "https://raw.githubusercontent.com/github/gitignore/main/README.md"
+        self.assertIn(gitignore, pats)
+        self.assertIn("gitignore", pats)
+        self.assertIn("README.md", pats)
+        self.assertIn(gitignore, docs["skill"])
+        self.assertIn(gitignore, docs["catalog"])
+
+    def test_teaching_notes_and_hard_cases(self):
+        docs = self._docs()
+        pats = docs["pats"]
+        for expected in self.NOTE_TEXTS:
+            self.assertIn(expected, pats)
+        self.assertIn("INPUT", docs["skill"])
+        self.assertIn("not the label", docs["skill"])
+        self.assertIn("<select>", docs["skill"])
+        self.assertIn("option text", docs["skill"])
+        self.assertIn("INPUT", docs["catalog"])
+        self.assertIn("not the label", docs["catalog"])
+        self.assertIn("<select>", docs["catalog"])
+        self.assertIn("option text", docs["catalog"])
+        self.assertIn("## Pattern 9", pats)
+        self.assertIn("https://the-internet.herokuapp.com/inputs", pats)
+        self.assertIn("input[type=number]", pats)
+        self.assertIn("https://the-internet.herokuapp.com/iframe", pats)
+        self.assertIn("Switch Frame", pats)
+        self.assertIn("body#tinymce", pats)
+        p8 = pats.split("## Pattern 8", 1)[1].split("## Pattern 9", 1)[0]
+        self.assertLess(
+            p8.find("Switch Frame"),
+            p8.find("body#tinymce"),
+            "Switch Frame then body#tinymce",
+        )
+        self.assertTrue(
+            ("#mce_0_ifr" in p8) or ("`iframe`" in p8) or ("selector `iframe`" in p8),
+            "Pattern 8 iframe requires an iframe selector",
+        )
+        self.assertIn("From file URL", pats)
+        self.assertIn(
+            "https://raw.githubusercontent.com/github/gitignore/main/README.md",
+            pats,
+        )
+        self.assertIn("gitignore", pats)
+        self.assertIn("README.md", pats)
+        for key in ("skill", "catalog"):
+            blob = docs[key]
+            self.assertIn("input[type=number]", blob)
+            self.assertIn("body#tinymce", blob)
+            self.assertIn("Switch Frame", blob)
+            self.assertIn(
+                "https://raw.githubusercontent.com/github/gitignore/main/README.md",
+                blob,
+            )
+
+    def test_checkboxes_and_shadow_hard_cases(self):
+        docs = self._docs()
+        pats = docs["pats"]
+        p8 = pats.split("## Pattern 8", 1)[1].split("## Pattern 9", 1)[0]
+        self.assertIn("https://the-internet.herokuapp.com/checkboxes", p8)
+        self.assertIn("#checkboxes input:nth-of-type(1)", p8)
+        self.assertIn("https://the-internet.herokuapp.com/shadowdom", p8)
+        self.assertIn('span[slot="my-text"]', p8)
+        self.assertIn("typed in shadow", p8)
+        self.assertIn("slotted light DOM", p8.replace("**", ""))
+        self.assertIn("shadowRoot", p8)
+        self.assertIn("my-paragraph", p8)
+        self.assertIn('slot name="my-text"', p8)
+        self.assertIn("not an input", p8)
+        self.assertIn("always Write JS", p8)
+        self.assertIn("hard rule", p8)
+        self.assertIn("document.querySelector('my-paragraph').shadowRoot", p8)
+        self.assertIn("Run locally", p8)
+        self.assertIn("pending ghost", p8)
+        self.assertIn("right panel", p8)
+        self.assertIn("Detect errors stayed green", p8)
+        # Catalog Click / Insert Text lock the same selectors and inspect-first rule.
+        catalog = docs["catalog"]
+        self.assertIn("#checkboxes input:nth-of-type(1)", catalog)
+        self.assertIn("https://the-internet.herokuapp.com/checkboxes", catalog)
+        self.assertIn("https://the-internet.herokuapp.com/shadowdom", catalog)
+        self.assertIn('span[slot="my-text"]', catalog)
+        self.assertIn("slotted light DOM", catalog)
+        self.assertIn("shadowRoot", catalog)
+        self.assertIn("my-paragraph", catalog)
+        self.assertIn("document.querySelector('my-paragraph').shadowRoot", catalog)
+        self.assertIn("not an input", catalog)
+        self.assertIn("always Write JS", catalog)
+        self.assertIn("Run locally", catalog)
+        skill = docs["skill"]
+        self.assertIn("#checkboxes input:nth-of-type(1)", skill)
+        self.assertIn('span[slot="my-text"]', skill)
+        self.assertIn("slotted light DOM", skill)
+        self.assertIn("shadowRoot", skill)
+        self.assertIn("my-paragraph", skill)
+        self.assertIn("not an input", skill)
+        self.assertIn("always Write JS", skill)
+        self.assertIn("pending ghost", skill)
+        self.assertIn("right panel", skill)
+        editor = docs["editor"]
+        self.assertIn("pending ghost", editor)
+        self.assertIn("right panel", editor)
+        self.assertIn("Form Input Select Upload", editor)
+
+    def test_no_baked_workflow_or_node_ids(self):
+        docs = self._docs()
+        for blob in docs.values():
+            self.assertNotIn("87462", blob)
+            self.assertNotRegex(blob, r"\{id:\s*\d{5,}")
+        self.assertIn("required handle", docs["pats"])
+        self.assertIn("Do **not** treat a workflow id or node", docs["pats"])
+
+
+class TestCssFirstSelectorsAndPattern9(unittest.TestCase):
+    """CSS-first incremental lists; XPath last resort; Pattern 9 tabs + nested loops."""
+
+    def _docs(self):
+        refs = SKILL_ROOT / "references"
+        return {
+            "skill": (SKILL_ROOT / "SKILL.md").read_text(encoding="utf-8"),
+            "prim": (refs / "platform-primitives.md").read_text(encoding="utf-8"),
+            "pats": (refs / "build-patterns.md").read_text(encoding="utf-8"),
+            "catalog": (refs / "block-catalog.md").read_text(encoding="utf-8"),
+        }
+
+    def test_version_is_1_3_17(self):
+        skill = (SKILL_ROOT / "SKILL.md").read_text(encoding="utf-8")
+        self.assertIn("version: 1.3.17", skill)
+        self.assertNotIn("version: 1.3.16", skill)
+
+    def test_css_first_rule_and_nth_filter(self):
+        docs = self._docs()
+        for key in ("skill", "prim", "pats", "catalog"):
+            blob = docs[key]
+            self.assertIn("Prefer regular CSS selectors unless XPath is absolutely necessary", blob)
+            self.assertIn(">> nth=", blob)
+        prim = docs["prim"]
+        self.assertIn(":nth-child({loop_index})", prim)
+        self.assertIn("{loop_index,1}", prim)
+        self.assertIn(">> nth={loop_index}", prim)
+        self.assertIn("0-based", prim)
+        self.assertIn("last resort", prim.lower())
+        self.assertIn("not a reason to use xpath", prim.lower())
+        self.assertIn("ol.row > li:nth-child({loop_index}) h3 a", prim)
+        self.assertIn("article.product_pod >> nth={loop_index,1}", prim)
+        self.assertIn("does **not** fix virtualized", prim)
+        # old preferred XPath-for-grids recipe must not remain the default
+        self.assertNotIn(
+            "this skill prefers XPath positional predicates",
+            prim,
+        )
+        catalog = docs["catalog"]
+        self.assertNotIn(
+            '(//article[contains(@class,"product_pod")])[{loop_index}]//h3/a',
+            catalog,
+        )
+        self.assertIn(">> nth={loop_index,1}", catalog)
+        self.assertIn(":nth-child({loop_index})", catalog)
+
+    def test_pattern1_and_2_are_css(self):
+        pats = self._docs()["pats"]
+        p1 = pats.split("## Pattern 1", 1)[1].split("## Pattern 2", 1)[0]
+        self.assertIn("ol.row > li:nth-child({loop_index}) h3 a", p1)
+        self.assertIn("article.product_pod >> nth={loop_index,1}", p1)
+        self.assertIn("**not** XPath", p1)
+        self.assertNotIn(
+            '(//article[contains(@class,"product_pod")])[{loop_index}]//h3/a',
+            p1,
+        )
+        p2 = pats.split("## Pattern 2", 1)[1].split("## Pattern 3", 1)[0]
+        self.assertIn("CSS {loop_index}", p2)
+        self.assertIn("ol.row > li:nth-child({loop_index}) h3 a", p2)
+        self.assertNotIn("XPath {loop_index} per column", p2)
+
+    def test_pattern7_css_is_fallback_write_js_verified(self):
+        pats = self._docs()["pats"]
+        p7 = pats.split("## Pattern 7", 1)[1].split("## Pattern 8", 1)[0]
+        self.assertIn('article[data-testid="tweet"]', p7)
+        self.assertIn(">> nth={loop_index,1}", p7)
+        self.assertIn("Legacy XPath", p7)
+        self.assertIn('[@data-testid="User-Name"]', p7)
+        self.assertIn('[@data-testid="tweetText"]', p7)
+        self.assertIn("does **not** fix virtualized X feeds", p7)
+        self.assertIn("Write JS stays the verified Pattern 7 path", p7)
+        self.assertIn("no-code fallback", p7.lower())
+
+    def test_pattern9_tabs_and_nested_loops(self):
+        docs = self._docs()
+        pats = docs["pats"]
+        skill = docs["skill"]
+        catalog = docs["catalog"]
+        self.assertIn("## Pattern 9", pats)
+        p9 = pats.split("## Pattern 9", 1)[1].split("## Pattern 10", 1)[0]
+        self.assertIn("Tab URL matching", p9)
+        self.assertIn("/windows/new", p9)
+        self.assertIn("https://the-internet.herokuapp.com/windows", p9)
+        self.assertIn("https://books.toscrape.com/", p9)
+        self.assertIn("ol.row > li:nth-child({loop_index}) h3 a", p9)
+        self.assertIn("li.next > a", p9)
+        self.assertIn("TAB TEST: opened, switched, closed", p9)
+        self.assertIn("NESTED LOOP TEST: 2 pages x 3 books", p9)
+        self.assertIn("over-match", p9.lower())
+        self.assertIn("Bring Pages to Front", p9)
+        self.assertIn("run setting", p9.lower())
+        self.assertIn("Pattern 9", skill)
+        self.assertIn("Tab URL matching", skill)
+        self.assertIn("/windows/new", skill)
+        self.assertIn("Tab URL matching", catalog)
+        self.assertIn("/windows", catalog)
+        self.assertIn("/windows/new", catalog)
+
+    def test_iframe_selector_and_main_frame_alias(self):
+        docs = self._docs()
+        for key in ("skill", "pats", "catalog"):
+            blob = docs[key]
+            self.assertIn("#mce_0_ifr", blob)
+            self.assertIn("Main frame", blob)
+            self.assertIn("Main page", blob)
+
+    def test_upload_file_column_via_url_and_keyboard_tab_twice(self):
+        catalog = self._docs()["catalog"]
+        self.assertIn("file column/variable", catalog.lower())
+        self.assertIn("From file URL", catalog)
+        self.assertIn("two separate Keyboard blocks", catalog)
+        skill = self._docs()["skill"]
+        self.assertIn("file column/variable", skill.lower())
+
+
+
+
+class TestClientPatterns10And11(unittest.TestCase):
+    """Client-bot Patterns 10/11/12: scheduler, webhook queue, branched form."""
+
+    FORBIDDEN = ("56878", "55290", "21214", "aitablekey")
+
+    def _docs(self):
+        refs = SKILL_ROOT / "references"
+        return {
+            "skill": (SKILL_ROOT / "SKILL.md").read_text(encoding="utf-8"),
+            "pats": (refs / "build-patterns.md").read_text(encoding="utf-8"),
+            "catalog": (refs / "block-catalog.md").read_text(encoding="utf-8"),
+            "run": (refs / "run-and-platform.md").read_text(encoding="utf-8"),
+        }
+
+    def test_version_is_1_3_17(self):
+        skill = self._docs()["skill"]
+        self.assertIn("version: 1.3.17", skill)
+        self.assertNotIn("version: 1.3.16", skill)
+
+    def test_pattern10_scheduled_dynamic_scrape(self):
+        docs = self._docs()
+        pats = docs["pats"]
+        self.assertIn("## Pattern 10", pats)
+        p10 = pats.split("## Pattern 10", 1)[1].split("## Pattern 11", 1)[0]
+        self.assertIn("Dynamic", p10)
+        self.assertIn("Contains keywords", p10)
+        self.assertIn("Send Notification", p10)
+        self.assertIn("no To:", p10)
+        self.assertIn("{id, name}", p10)
+        self.assertIn("CurrentDate", p10)
+        self.assertIn("Break Repeat", p10)
+        self.assertIn("Every day", p10)
+        self.assertIn("Delay hour-based start", p10)
+        self.assertIn("Timezone", p10)
+        self.assertIn("no catch-up", p10.lower())
+        self.assertIn("deactive", p10)
+        self.assertIn("My references", p10)
+        self.assertIn("Pattern 10", docs["skill"])
+        self.assertIn("Newest rows first", docs["catalog"])
+
+    def test_pattern11_webhook_http_rejoin(self):
+        docs = self._docs()
+        pats = docs["pats"]
+        self.assertIn("## Pattern 11", pats)
+        p11 = pats.split("## Pattern 11", 1)[1].split("## Pattern 12", 1)[0]
+        self.assertIn("webhook.zerowork.io/trigger", p11)
+        self.assertIn("Bearer {id, name}", p11)
+        self.assertIn("Nested record path", p11)
+        self.assertIn("rejoin", p11.lower())
+        self.assertIn("PRO", p11)
+        self.assertIn("VERY SLOW", p11)
+        self.assertIn("Insert instantly", p11)
+        self.assertIn("inactive", p11.lower())
+        self.assertIn("webhook.zerowork.io/trigger", docs["skill"])
+        self.assertIn("webhook.zerowork.io/trigger", docs["run"])
+        self.assertIn("Nested record path", docs["catalog"])
+        self.assertIn("Pattern 11", docs["skill"])
+
+    def test_pattern12_branched_form_short(self):
+        pats = self._docs()["pats"]
+        self.assertIn("## Pattern 12", pats)
+        p12 = pats.split("## Pattern 12", 1)[1].split("## Pattern 13", 1)[0]
+        self.assertIn("AM / PM", p12)
+        self.assertIn("toLocaleString", p12)
+        self.assertIn("Apply Regex", p12)
+        self.assertIn("146-node", p12)
+        self.assertIn("deactive", p12)
+        self.assertIn("webhook.zerowork.io/trigger", p12)
+        self.assertIn("Pattern 12", self._docs()["skill"])
+
+    def test_webhook_dynamic_deactive_nested_path(self):
+        docs = self._docs()
+        blobs = "\n".join(docs.values())
+        self.assertIn("webhook.zerowork.io/trigger", blobs)
+        self.assertIn("Dynamic", docs["pats"])
+        self.assertIn("deactive", docs["pats"])
+        self.assertIn("deactive", docs["catalog"])
+        self.assertIn("deactivated", docs["pats"].lower())
+        self.assertIn("Nested record path", docs["pats"])
+        self.assertIn("Nested record path", docs["catalog"])
+        self.assertIn("canvas", docs["catalog"].lower())
+        self.assertIn("lies", docs["catalog"])
+
+    def test_no_live_client_ids_or_aitablekey(self):
+        docs = self._docs()
+        for name, blob in docs.items():
+            for token in self.FORBIDDEN:
+                self.assertNotIn(
+                    token,
+                    blob,
+                    "%s must not contain live id/token %s" % (name, token),
+                )
+            self.assertNotRegex(blob, r"\{id:\s*\d{5,}")
+
+
+
+
+
+
+class TestClientPatterns13To16(unittest.TestCase):
+    """Client-bot Patterns 13-16: outreach DM, enrich, FB scrape/reply, IG vision."""
+
+    FORBIDDEN = (
+        "61072",
+        "60018",
+        "49000",
+        "56935",
+        "51184",
+        "n8n.gohighroad",
+        "leancodeautomation",
+    )
+
+    def _docs(self):
+        refs = SKILL_ROOT / "references"
+        return {
+            "skill": (SKILL_ROOT / "SKILL.md").read_text(encoding="utf-8"),
+            "pats": (refs / "build-patterns.md").read_text(encoding="utf-8"),
+            "catalog": (refs / "block-catalog.md").read_text(encoding="utf-8"),
+            "prim": (refs / "platform-primitives.md").read_text(encoding="utf-8"),
+            "wjs": (refs / "write-javascript.md").read_text(encoding="utf-8"),
+        }
+
+    def test_version_is_1_3_17(self):
+        skill = self._docs()["skill"]
+        self.assertIn("version: 1.3.17", skill)
+        self.assertNotIn("version: 1.3.16", skill)
+
+    def test_pattern13_linkedin_outreach_dm(self):
+        docs = self._docs()
+        pats = docs["pats"]
+        self.assertIn("## Pattern 13", pats)
+        p13 = pats.split("## Pattern 13", 1)[1].split("## Pattern 14", 1)[0]
+        self.assertIn("Delete current row in a loop", p13)
+        self.assertIn("ELSE", p13)
+        self.assertIn("if no other condition is met", p13)
+        self.assertIn("Save error message to", p13)
+        self.assertIn("My references", p13)
+        self.assertIn("{id, name", p13)
+        self.assertIn("No LinkedIn API", p13)
+        self.assertIn("main button[aria-label*=\"Message\"]", p13)
+        self.assertIn("Use spintax", p13)
+        self.assertIn("Pattern 13", docs["skill"])
+        self.assertIn("Delete current row in a loop", docs["catalog"])
+        self.assertIn("if no other condition is met", docs["catalog"])
+        self.assertIn("Save error message to", docs["catalog"])
+
+    def test_pattern14_dynamic_enrich(self):
+        docs = self._docs()
+        pats = docs["pats"]
+        self.assertIn("## Pattern 14", pats)
+        p14 = pats.split("## Pattern 14", 1)[1].split("## Pattern 15", 1)[0]
+        self.assertIn("RUN LIST", p14)
+        self.assertIn("Keyboard Space", p14)
+        self.assertIn("50000", p14)
+        self.assertIn("deactivated", p14.lower())
+        self.assertIn("My references", p14)
+        self.assertIn("Pattern 14", docs["skill"])
+        self.assertIn("production hygiene", docs["catalog"])
+
+    def test_pattern15_facebook_scrape_reply(self):
+        docs = self._docs()
+        pats = docs["pats"]
+        self.assertIn("## Pattern 15", pats)
+        p15 = pats.split("## Pattern 15", 1)[1].split("## Pattern 16", 1)[0]
+        self.assertIn("isActive", p15)
+        self.assertIn("appendIndex", p15)
+        self.assertIn("Keyboard Enter", p15)
+        self.assertIn("remove_duplicate_rows", p15)
+        self.assertIn("Sheets-backed", p15)
+        self.assertIn("My references", p15)
+        self.assertIn("Pattern 15", docs["skill"])
+        self.assertIn("appendIndex", docs["wjs"])
+        self.assertIn("Keyboard Enter", docs["catalog"])
+        self.assertIn("without a Sheets", docs["prim"])
+
+    def test_pattern16_instagram_vision(self):
+        docs = self._docs()
+        pats = docs["pats"]
+        self.assertIn("## Pattern 16", pats)
+        p16 = pats.split("## Pattern 16", 1)[1].split("## Pattern 17", 1)[0]
+        self.assertIn("Count elements matching selector", p16)
+        self.assertIn("Lead selector", p16)
+        self.assertIn("Custom attribute", p16)
+        self.assertIn("src", p16)
+        self.assertIn("choices[0].message.content", p16)
+        self.assertIn("JSON path can become the variable name", p16)
+        self.assertIn("deactivated", p16.lower())
+        self.assertIn("My references", p16)
+        self.assertIn("Pattern 16", docs["skill"])
+        self.assertIn("Count elements matching selector", docs["catalog"])
+        self.assertIn("Custom attribute", docs["catalog"])
+        self.assertIn("`src`", docs["catalog"])
+
+    def test_catalog_platform_facts(self):
+        docs = self._docs()
+        blobs = "\n".join(docs.values())
+        self.assertIn("ELSE", blobs)
+        self.assertIn("if no other condition is met", blobs)
+        self.assertIn("Delete current row in a loop", blobs)
+        self.assertIn("appendIndex", blobs)
+        self.assertIn("Count elements matching selector", blobs)
+        self.assertIn("Custom attribute", blobs)
+        self.assertIn("Keyboard Enter", blobs)
+        self.assertIn("isActive", blobs)
+        self.assertIn("JSON path can become the variable name", blobs)
+        self.assertIn("production hygiene", blobs)
+        self.assertIn("Sheets-backed table can exist without a Sheets", blobs)
+
+    def test_no_live_client_ids_or_vendor_tokens(self):
+        docs = self._docs()
+        for name, blob in docs.items():
+            for token in self.FORBIDDEN:
+                self.assertNotIn(
+                    token,
+                    blob,
+                    "%s must not contain live id/token %s" % (name, token),
+                )
+            self.assertNotRegex(blob, r"\{id:\s*\d{5,}")
+
+
+
+class TestClientPatterns17To19(unittest.TestCase):
+    """Client-bot Patterns 17-19: two-phase enrich, Sheets property, HTTP status."""
+
+    FORBIDDEN = (
+        "58586",
+        "58439",
+        "59008",
+        "57800",
+        "57424",
+        "31875",
+        "114268",
+        "113956",
+        "115164",
+        "115157",
+        "112723",
+        "112719",
+        "112710",
+        "112105",
+        "57446",
+        "docs.google.com/spreadsheet",
+        "docs.google.com/spread",
+        "activepieces",
+        "appsumo.com/products/",
+    )
+
+    def _docs(self):
+        refs = SKILL_ROOT / "references"
+        return {
+            "skill": (SKILL_ROOT / "SKILL.md").read_text(encoding="utf-8"),
+            "pats": (refs / "build-patterns.md").read_text(encoding="utf-8"),
+            "catalog": (refs / "block-catalog.md").read_text(encoding="utf-8"),
+            "prim": (refs / "platform-primitives.md").read_text(encoding="utf-8"),
+            "wjs": (refs / "write-javascript.md").read_text(encoding="utf-8"),
+        }
+
+    def test_version_is_1_3_17(self):
+        skill = self._docs()["skill"]
+        self.assertIn("version: 1.3.17", skill)
+        self.assertNotIn("version: 1.3.16", skill)
+
+    def test_pattern17_two_phase_no_run_taskbot(self):
+        docs = self._docs()
+        pats = docs["pats"]
+        self.assertIn("## Pattern 17", pats)
+        p17 = pats.split("## Pattern 17", 1)[1].split("## Pattern 18", 1)[0]
+        self.assertIn("Delete all rows", p17)
+        self.assertIn("Count elements matching selector", p17)
+        self.assertIn("a[href*=products]", p17)
+        self.assertIn(">> nth={loop_index,0}", p17)
+        self.assertIn("After Repeat", p17)
+        self.assertIn("Dynamic", p17)
+        self.assertIn("My references", p17)
+        self.assertIn("{id, name", p17)
+        self.assertIn("no To:", p17)
+        self.assertIn("run finished", p17)
+        self.assertIn("Truncate-then-refill", p17)
+        self.assertIn("Delete current row in a loop", p17)
+        self.assertIn("insert_date", p17)
+        self.assertIn("Date Added", p17)
+        self.assertIn("dead-end", p17.lower())
+        self.assertIn("input[placeholder=Email]", p17)
+        self.assertIn("tableRefId", p17)
+        self.assertIn("test URL", p17)
+        self.assertIn("Honest hole", p17)
+        self.assertIn("run_taskbot", p17)
+        self.assertIn("absent from", p17.lower())
+        self.assertIn("Pattern 17", docs["skill"])
+        self.assertIn(">> nth={loop_index,0}", docs["skill"])
+        self.assertIn(">> nth={loop_index,0}", docs["catalog"])
+        self.assertIn(">> nth={loop_index,0}", docs["prim"])
+
+    def test_pattern18_sheets_table_property(self):
+        docs = self._docs()
+        pats = docs["pats"]
+        self.assertIn("## Pattern 18", pats)
+        p18 = pats.split("## Pattern 18", 1)[1].split("## Pattern 19", 1)[0]
+        self.assertIn("table property", p18)
+        self.assertIn("Sheets icon", p18)
+        self.assertIn("Edit Google Sheets link", p18)
+        self.assertIn("Remove from this TaskBot", p18)
+        self.assertIn("About this table", p18)
+        self.assertIn("Selected sheet", p18)
+        self.assertIn("Used in TaskBots", p18)
+        self.assertIn("Delete Spreadsheet Data", p18)
+        self.assertIn("mix", p18.lower())
+        self.assertIn("My references", p18)
+        self.assertIn("{id, name: CurrentSubSectionID} + ul + p a", p18)
+        self.assertIn("/#(.*)/", p18)
+        self.assertIn("Save to: Variables", p18)
+        self.assertIn("cross-table cell copier", p18)
+        self.assertIn("Tab number", p18)
+        self.assertIn("Pattern 18", docs["skill"])
+        self.assertIn("green Sheets icon", docs["skill"])
+        self.assertIn("green Sheets icon", docs["prim"])
+        self.assertIn("table property", docs["prim"])
+        self.assertIn("Edit Google Sheets link", docs["prim"])
+        self.assertIn("Variable interpolated inside a CSS selector", docs["prim"])
+        self.assertIn("cross-table cell copier", docs["catalog"])
+        self.assertIn("Save to: Variables", docs["catalog"])
+
+    def test_pattern19_http_status_only(self):
+        docs = self._docs()
+        pats = docs["pats"]
+        self.assertIn("## Pattern 19", pats)
+        p19 = pats.split("## Pattern 19", 1)[1].split("## Node Playground", 1)[0]
+        self.assertIn("Save response status code", p19)
+        self.assertIn("three independent slots", p19)
+        self.assertIn("200", p19)
+        self.assertIn("intentional", p19.lower())
+        self.assertIn("My references", p19)
+        self.assertIn("{id, name: URL}", p19)
+        self.assertIn("outbound webhook", p19.lower())
+        self.assertIn("{id, name: transcript}", p19)
+        self.assertIn("{id, name: videoId}", p19)
+        self.assertIn("Perform right-click", p19)
+        self.assertIn("Use human-like clicking", p19)
+        self.assertIn("Pattern 19", docs["skill"])
+        self.assertIn("Save response status code", docs["skill"])
+        self.assertIn("three independent slots", docs["skill"])
+        self.assertIn("Save response status code", docs["catalog"])
+        self.assertIn("three independent slots", docs["catalog"])
+        self.assertIn("Perform right-click", docs["catalog"])
+        self.assertIn("Use human-like clicking", docs["catalog"])
+        self.assertIn("tableRefId", docs["wjs"])
+        self.assertIn("test URL", docs["wjs"])
+        self.assertIn("My references", docs["wjs"])
+
+    def test_nth_loop_index_zero_and_status_code(self):
+        docs = self._docs()
+        blobs = "\n".join(docs.values())
+        self.assertIn(">> nth={loop_index,0}", blobs)
+        self.assertIn("Save response status code", blobs)
+        self.assertIn("green Sheets icon", blobs)
+        self.assertIn("table property", blobs)
+        self.assertIn("Perform right-click", blobs)
+        self.assertIn("Use human-like clicking", blobs)
+        self.assertIn("absent from", blobs.lower())
+        self.assertIn("this client", blobs.lower())
+
+    def test_no_live_ids_sheets_urls_or_activepieces(self):
+        docs = self._docs()
+        for name, blob in docs.items():
+            for token in self.FORBIDDEN:
+                self.assertNotIn(
+                    token,
+                    blob,
+                    "%s must not contain live id/url/token %s" % (name, token),
+                )
+            self.assertNotRegex(blob, r"\{id:\s*\d{5,}")
 
 
 if __name__ == "__main__":

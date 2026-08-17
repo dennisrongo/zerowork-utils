@@ -69,27 +69,53 @@ Replace the increment with `{loop_index}` (see Start Repeat):
 li:nth-child({loop_index}) > … > span
 ```
 
+**Prefer regular CSS selectors unless XPath is absolutely necessary**
+(readability). Official docs treat CSS as the default and XPath as
+advanced. Official incremental example:
+`main#main li:nth-child({loop_index}) > …`
+
 Two official methods:
 
 | Method | Example | Index base | Console-checkable? |
 |---|---|---|---|
-| `:nth-child(N)` / `:nth-of-type(N)` | `li:nth-child({loop_index}) a[data-anonymize='person-name']` | **1-based** | Yes (`querySelectorAll`) |
+| `:nth-child(N)` | `li:nth-child({loop_index}) a[data-anonymize='person-name']` | **1-based** | Yes (`querySelectorAll`) |
 | `>> nth=N` (ZeroWork filter) | `a[data-anonymize='person-name'] >> nth={loop_index,1}` | **0-based** (`0` = first) | **No** |
 
-`>> nth=` is easier (you don't have to find the incrementing ancestor) but
-less precise. `:nth-child` is more precise (you pin the list item) but you
-must find the repeating tag.
+Prefer `:nth-child({loop_index})` on the **repeating sibling** when you
+can (console-checkable). `>> nth=` is easier (you don't have to find the
+incrementing ancestor) but less precise and not console-checkable.
 
-**Verified gotcha (this skill):** CSS `:nth-of-type({loop_index})` **breaks
-when matches live under different parents** (product grids). It found item 1
-then hard-failed. Prefer an XPath that indexes the **global** match list:
+Official whole-list forms for `>> nth=` are slightly inconsistent:
+lists page writes `{loop_index,1}`; Standard Loop writes
+`>> nth={loop_index}`. Encode both. The nth filter itself is 0-based
+(`0` = first). Prefer `:nth-child({loop_index})` to avoid the
+ambiguity.
+
+**Verified gotcha (this skill):** CSS `:nth-of-type({loop_index})`
+**breaks when matches live under different parents** (product grids).
+It found item 1 then hard-failed. That is a gotcha about
+`:nth-of-type`, not a reason to use XPath. The fix is `>> nth=`
+on the global match list, or a correct `:nth-child` on the repeating
+`li`:
 
 ```
-(//article[contains(@class,"product_pod")])[{loop_index}]//h3/a
+ol.row > li:nth-child({loop_index}) h3 a
+article.product_pod >> nth={loop_index,1}
 ```
 
-Without `{loop_index}`, Save Web Element always grabs the **first** match
-(20 identical rows).
+(`>> nth={loop_index}` is the Standard Loop wording of the same
+filter.) Live client confirmation of the CSS-first official form:
+lead selector + `>> nth={loop_index,0}` (0-based; `0` = first),
+e.g. `a[href*=products] >> nth={loop_index,0}` (Pattern 17).
+Encode `{loop_index,0}` alongside `{loop_index,1}` /
+`>> nth={loop_index}`. Grids stay CSS. XPath is last resort, not
+"because it's a grid".
+
+Without `{loop_index}`, Save Web Element always grabs the **first**
+match (20 identical rows).
+
+CSS `{loop_index}` does **not** fix virtualized / remounting feeds
+(X, LinkedIn). Those stay Write JS (Pattern 7).
 
 ### `{loop_index}` syntax (Standard loop)
 
@@ -102,15 +128,21 @@ Official: Start Repeat → Standard Loop.
 | `{loop_index,1,2}` | Start at 1, skip 2 each step (odd items: 1, 3, 5…) |
 | `{loop_index_123}` | Index of the Start Repeat whose node id is `123` (parent loop, for nested row×column tables) |
 
-`>> nth=` is 0-based, so the whole-list form is `{loop_index,1}` (or
-`>> nth={loop_index}` after adjusting). `:nth-child` is 1-based.
+`>> nth=` is 0-based (`0` = first). Official whole-list forms:
+lists page `{loop_index,1}`; Standard Loop `>> nth={loop_index}`;
+live client `>> nth={loop_index,0}` (Pattern 17).
+`:nth-child` is 1-based — prefer it when you can pin the repeating
+sibling.
 
-### XPath
+### XPath (advanced / last resort)
 
 ZeroWork auto-detects XPath when the selector starts with `//`. You can also
 prefix `xpath=//button`. Same `{loop_index}` substitution as CSS. Official
-docs treat XPath as advanced; this skill prefers XPath positional predicates
-for grid scrapes (see above).
+docs treat XPath as advanced. **Prefer regular CSS selectors unless XPath
+is absolutely necessary.** Allowed only when CSS + ZeroWork filters
+(`text=` / `>> text=` / `>> nth=` / `:nth-child`) cannot express the
+address: ancestor/following axes, or complex predicates CSS cannot
+write. Not "because it's a grid".
 
 ### Uniqueness rule of thumb
 
@@ -133,7 +165,8 @@ are signed in can return 0 in the agent's incognito window.
    `data-testid`, `data-urn`, `aria-label`, `role`, `name`, `type`.
    Chrome's Copy → Copy selector often emits a long `:nth-child` chain
    that dies on the next render. Copy XPath is the same class of
-   brittle unless you rewrite it as a global predicate (see above).
+   brittle — rewrite as CSS `:nth-child` / `>> nth=` before falling
+   back to XPath.
 3. **Harvest candidates in the console** (page JS, on that document):
 
    ```js
@@ -166,12 +199,15 @@ are signed in can return 0 in the agent's incognito window.
    scrape does not grab the first page-wide match every row.
 5. **Pick the block:**
    - Stable repeating grid, same parent shape → Save Web Element +
-     XPath `{loop_index}` (Pattern 1).
-   - Next/page numbered UI → nested loops (Pattern 2).
+     CSS `{loop_index}` (Pattern 1): pin
+     `ol.row > li:nth-child({loop_index}) h3 a`, or
+     `article.product_pod >> nth={loop_index,1}`.
+   - Next/page numbered UI → nested loops (Pattern 2 / 9).
    - Virtualized / infinite feed (cards unmount on scroll: LinkedIn,
      X/Twitter, Facebook) → Write JS. Collect **while scrolling**; a
      selector that matches 8 cards at the top can match 0 after the
      virtualizer recycles the DOM. Do **not** use `{loop_index}` here.
+     CSS `{loop_index}` does **not** fix virtualized X feeds.
 6. **When you have no page JS** (cua-driver on Creator Chrome cannot
    `execute_javascript` in standard mode): UIA names are not CSS. Open
    the **target site** in a tab you can console, or drop a temporary
@@ -290,6 +326,10 @@ Hello {id: 123, name: "Profile name"}, I wanted to reach out because…
   editor page is reloaded (drawers cache the list at load).
 - Interpolation also works in Log messages:
   `Result: {id: <dgId>, name: <var>}`.
+- **Variable interpolated inside a CSS selector** is first-class:
+  `{id, name: CurrentSubSectionID} + ul + p a` (regex-extracted hash
+  + sibling combinators). Reset the variable each iteration so a
+  stale value cannot leak. Pick the ref with **V / My references**.
 
 ### 2. Code in inputs (Desktop Agent ≥ 1.1.72)
 
@@ -382,6 +422,15 @@ Worked official example: cap outbound DMs at 30 per run → variable
 Sheets writes are batched (default every 50 rows; adjustable on Start Repeat
 additional options). Parallel TaskBots on Sheets are the usual quota-killer.
 Deleted / de-authed Sheet → run refuses to start.
+A **Sheets-backed table can exist without a Sheets *block*** — Sheets is a
+**table property**, not a building block (Pattern 18). Sidebar → Tables:
+grey grid = native; **green Sheets icon** = linked. Kebab: **Edit Google Sheets link** / **Remove from this TaskBot** / **Delete table** / **About this table** (Table ID, Created, Sheets URL, Selected sheet, Used in
+TaskBots). Ordinary save / update_variable / delete_table_data write
+through and sync. "Delete Spreadsheet Data" is just delete_table_data
+all-rows on the linked table. A bot can **mix** plain native tables and
+Sheets-linked tables. Loop either with Start Repeat Dynamic like a
+native table (Pattern 15 / 18). There is no Google Sheets palette node.
+Never bake a Sheets URL.
 
 ### Convert native → Google Sheet
 
@@ -416,7 +465,7 @@ Full REST wording: [rest-api.md](rest-api.md).
 4. **On Catch Error** and **After Try-Catch** both wire **directly off
    Start Try-Catch**, never off the try-body or each other.
 5. Set Condition (`conditionNode`) has **one** output. Multi-branch = N Set
-   Condition blocks off one Start Condition, including an **Else**.
+   Condition blocks off one Start Condition, including an **ELSE** ("if no other condition is met").
 6. Deactivated nodes still count for structural rules.
 7. Empty required fields are named by node id.
 

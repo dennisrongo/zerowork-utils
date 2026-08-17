@@ -1,6 +1,6 @@
 {
   "name": "Demo - X Feed Scraper",
-  "post_assemble": "Keys fill, text, and source are post-assemble drawer/note/Monaco hints. REST assemble ignores them \u2014 there is no REST drawer write. Do not treat a workflow id or node id as a required handle.",
+  "post_assemble": "Keys fill, text, and source are post-assemble drawer/note/Monaco hints. REST assemble ignores them \u2014 there is no REST drawer write. Do not treat a workflow id or node id as a required handle. fill.selector is the live/legacy XPath; fill.selector_css is the CSS-first equivalent (>> nth={loop_index,1}).",
   "table": {
     "name": "x_feed_posts",
     "columns": [
@@ -114,7 +114,9 @@
         "save_as": "Link",
         "table": "x_feed_posts",
         "column": "post_url",
-        "skip_if_missing": false
+        "skip_if_missing": false,
+        "selector_css": "article[data-testid=\"tweet\"] a[href*=\"/status/\"] >> nth={loop_index,1}",
+        "selector_note": "CSS-first no-code fallback. Live drawer may still hold the XPath selector. Write JS stays the verified Pattern 7 path \u2014 CSS {loop_index} does not fix virtualized X feeds. Legacy XPath only if CSS fails. Do not invent node ids."
       }
     },
     {
@@ -127,7 +129,9 @@
         "selector": "(//article[@data-testid=\"tweet\"])[{loop_index}]//*[@data-testid=\"User-Name\"]",
         "save_as": "Text",
         "table": "x_feed_posts",
-        "column": "author"
+        "column": "author",
+        "selector_css": "article[data-testid=\"tweet\"] [data-testid=\"User-Name\"] >> nth={loop_index,1}",
+        "selector_note": "CSS-first no-code fallback. Live drawer may still hold the XPath selector. Write JS stays the verified Pattern 7 path \u2014 CSS {loop_index} does not fix virtualized X feeds. Legacy XPath only if CSS fails. Do not invent node ids."
       }
     },
     {
@@ -141,7 +145,9 @@
         "save_as": "Text",
         "skip_if_missing": true,
         "table": "x_feed_posts",
-        "column": "post_text"
+        "column": "post_text",
+        "selector_css": "article[data-testid=\"tweet\"] [data-testid=\"tweetText\"] >> nth={loop_index,1}",
+        "selector_note": "CSS-first no-code fallback. Live drawer may still hold the XPath selector. Write JS stays the verified Pattern 7 path \u2014 CSS {loop_index} does not fix virtualized X feeds. Legacy XPath only if CSS fails. Do not invent node ids."
       }
     },
     {
@@ -156,7 +162,9 @@
         "attribute": "datetime",
         "table": "x_feed_posts",
         "column": "posted_at",
-        "skip_if_missing": true
+        "skip_if_missing": true,
+        "selector_css": "article[data-testid=\"tweet\"] time >> nth={loop_index,1}",
+        "selector_note": "CSS-first no-code fallback. Live drawer may still hold the XPath selector. Write JS stays the verified Pattern 7 path \u2014 CSS {loop_index} does not fix virtualized X feeds. Legacy XPath only if CSS fails. Do not invent node ids."
       }
     },
     {

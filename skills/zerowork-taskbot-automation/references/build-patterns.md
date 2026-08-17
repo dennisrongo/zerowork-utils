@@ -27,10 +27,21 @@ another bot (405) — always create fresh per bot. Every bot auto-gets a "Variab
 Start Repeat (Standard → Count elements matching selector, lead `.product_pod h3 a`)
   → Save Web Element × N (inside loop)
 ```
-- Incremental selector = **XPath with positional predicate**:
-  `(//article[contains(@class,"product_pod")])[{loop_index}]//h3/a`
-- CSS `:nth-of-type({loop_index})` BREAKS when matches live under different parents
-  (grid rows) — found element 1 then hard-failed. XPath indexes the global match list.
+- Incremental selector = **CSS**. Prefer `:nth-child` on the repeating sibling
+  (1-based, console-checkable):
+  `ol.row > li:nth-child({loop_index}) h3 a`
+  Official docs example: `main#main li:nth-child({loop_index}) > …`
+- Global match list without pinning a parent:
+  `article.product_pod >> nth={loop_index,1}`
+  (lists-page whole-list form; Standard Loop also writes
+  `>> nth={loop_index}`). `>> nth=` is 0-based (`0` = first) and not
+  console-checkable.
+- CSS `:nth-of-type({loop_index})` BREAKS when matches live under different
+  parents (grid rows) — found element 1 then hard-failed. That is a
+  `:nth-of-type` gotcha. The fix is `>> nth=` or a correct `:nth-child`
+  on the repeating `li`, **not** XPath.
+- **Prefer regular CSS selectors unless XPath is absolutely necessary.**
+  Grids stay CSS.
 - Without `{loop_index}`, SaveWE grabs the FIRST match every iteration (20 identical rows).
 - Save Web Element → Save-as: **Custom attribute** + attribute name (`title`) for attr
   scraping; Text/Link/HTML/Image URL for the others.
@@ -42,11 +53,19 @@ Start Repeat (Standard → Count elements matching selector, lead `.product_pod 
 Open Link
 → Start Repeat (outer, Standard → Fixed N = page count)
 → Start Repeat (inner, Standard → Count elements + lead selector)
-     inner out 1 → SaveWE × N (XPath {loop_index} per column)
+     inner out 1 → SaveWE × N (CSS {loop_index} per column)
      inner out 2 → After Repeat → Click (Next `li.next > a`) → Log
 ```
+- Inner Save WE example: `ol.row > li:nth-child({loop_index}) h3 a`
+  (or `article.product_pod >> nth={loop_index,1}`).
 - **After Repeat takes the INNER loop's SECOND output** — never chain it after the saves
-  (validator: "must be preceded by a single Start Repeat").
+  (validator: "must be preceded by a single Start Repeat"). After Repeat
+  wires DIRECTLY off its Start Repeat.
+- Loop type MUST be set (Standard vs Dynamic). Unset is a live footgun.
+  Standard = append new rows. Dynamic = iterate existing rows.
+- Continue-until-no-element needs a web-element action in the body; set a
+  repetition limit on long/endless lists. Skip-if-not-found / Try-Catch
+  swallows the end condition — then you need auto-scroll or Break.
 - Race: last-page saves can beat render (~6/60 missed). Mitigate with a Delay after
   Click Next or a wait-selector check.
 - Start Repeat MAY have multiple outgoing edges; all other blocks single-out only.
@@ -180,7 +199,8 @@ alone does **not** prove the HTTP body was saved.
 ## Pattern 6 — LinkedIn home-feed scrape (SPA, infinite scroll)
 
 LinkedIn's feed is a virtualized SPA. CSS `{loop_index}` / `:nth-of-type` is the
-wrong tool (cards remount under different parents). Use Pattern 3 (Write JS +
+wrong tool (cards remount under different parents). CSS `{loop_index}` does
+**not** fix virtualized feeds. Use Pattern 3 (Write JS +
 `appendIndex`) inside Try-Catch.
 
 ```
@@ -260,8 +280,9 @@ part of the skill and must never be committed. Put the live in-page
 scrape back once Agent Chrome has a session.
 
 **Why not Save Web Element × N:** feed cards are not a stable incremental list.
-XPath `({loop_index})` works for static grids (Pattern 1), not LinkedIn's
-occluded virtualizer.
+CSS `{loop_index}` / `>> nth=` works for static grids (Pattern 1), not
+LinkedIn's occluded virtualizer. CSS `{loop_index}` does **not** fix
+virtualized feeds.
 
 ## Pattern 7 — X/Twitter home-feed scrape (infinite / virtualized)
 
@@ -281,7 +302,7 @@ Clear previous rows          delete_table_data (all rows)
 → Scrape scope               try        **at most 3 wires**
      → Scroll rounds         loop  Standard, Fixed 6, auto-scroll off
           → Save visible tweets   loop  Standard, Count article[data-testid="tweet"]
-               → Save post URL / author / text / time   save × N, XPath {loop_index}
+               → Save post URL / author / text / time   save × N, CSS {loop_index} fallback
           → After tweet loop      continue_after_repeat  (off inner loop)
                → Page down        keyboard  PageDown (or End) — empty key fails the scrape
                → Wait for new tweets  sleep 2s (recipe default; live Demo was min 1 / max 1 — do not silently change the live bot)
@@ -310,10 +331,10 @@ filled):
 
 | Node | Live | Selector / mode | Save as | table.column | skip |
 |---|---|---|---|---|---|
-| Save post URL | fully set | `(//article[@data-testid='tweet'])[{loop_index}]//a[contains(@href,'/status/')]` | **Link** | `x_feed_posts.post_url` | unchecked |
-| Save author | EMPTY selector, no table | `(//article[@data-testid="tweet"])[{loop_index}]//*[@data-testid="User-Name"]` | **Text** | `x_feed_posts.author` | |
-| Save tweet text | EMPTY | `(//article[@data-testid="tweet"])[{loop_index}]//*[@data-testid="tweetText"]` | **Text** | `x_feed_posts.post_text` | skip-if-missing **ON** |
-| Save posted time | node **exists** (below Save tweet text, already wired), drawer EMPTY | `(//article[@data-testid="tweet"])[{loop_index}]//time` | **Custom attribute** `datetime` | `x_feed_posts.posted_at` | skip-if-missing **ON** |
+| Save post URL | fully set | CSS first: `article[data-testid="tweet"] a[href*="/status/"] >> nth={loop_index,1}`. Legacy XPath (only if CSS fails): `(//article[@data-testid='tweet'])[{loop_index}]//a[contains(@href,'/status/')]` | **Link** | `x_feed_posts.post_url` | unchecked |
+| Save author | EMPTY selector, no table | CSS first: `article[data-testid="tweet"] [data-testid="User-Name"] >> nth={loop_index,1}`. Legacy XPath (only if CSS fails): `(//article[@data-testid="tweet"])[{loop_index}]//*[@data-testid="User-Name"]` | **Text** | `x_feed_posts.author` | |
+| Save tweet text | EMPTY | CSS first: `article[data-testid="tweet"] [data-testid="tweetText"] >> nth={loop_index,1}`. Legacy XPath (only if CSS fails): `(//article[@data-testid="tweet"])[{loop_index}]//*[@data-testid="tweetText"]` | **Text** | `x_feed_posts.post_text` | skip-if-missing **ON** |
+| Save posted time | node **exists** (below Save tweet text, already wired), drawer EMPTY | CSS first: `article[data-testid="tweet"] time >> nth={loop_index,1}`. Legacy XPath (only if CSS fails): `(//article[@data-testid="tweet"])[{loop_index}]//time` | **Custom attribute** `datetime` | `x_feed_posts.posted_at` | skip-if-missing **ON** |
 | Clear previous rows | | table `x_feed_posts`, **Delete all rows** | | | |
 | Launch Chrome (bypass) | | Bypass bot detection **On**; everything else **Use current defaults** | | | |
 | Open X home | | `https://x.com/home` | | | |
@@ -349,7 +370,11 @@ rounds (or Live Runs showing PageDown + N unique URLs) is the
 pagination proof.
 
 **Live-verified harvest (Demo - X Feed Scraper):** X remounts tweet
-cards, so `{loop_index}` cannot hold a stable list. One connected
+cards, so `{loop_index}` cannot hold a stable list. CSS
+`{loop_index}` / `>> nth=` does **not** fix virtualized X feeds —
+Write JS stays the verified Pattern 7 path. The CSS Save WE
+selectors above are a **no-code fallback only** (static mounted
+cards, or books.toscrape-class grids). One connected
 Write JS named **Harvest while scroll**, on the spine **before**
 Scrape scope (try) — not a sibling off Try (that is the fourth
 wire). Browser execution — leave **Run locally**
@@ -403,6 +428,665 @@ named Harvest while scroll. Verify with `item/get_count/` +
 Live Runs harvest / scroll-round lines, not `execution.success`.
 
 
+## Pattern 8 — Form input, select, upload (verified live: Demo - Form Input Select Upload)
+
+Live bot name is a label only. Do **not** treat a workflow id or node
+id as a required handle. Rebuild from this recipe; pick refs with
+**V / My references**, never paste another bot's `{id,name}` id.
+
+Safe practice site: **the-internet.herokuapp.com** (not a client form).
+
+```
+Open login              open_link    https://the-internet.herokuapp.com/login
+→ Type username         insert_data  tomsmith / `#username`
+→ Type password         insert_data  SuperSecretPassword! / `#password`
+→ Click login           click        `button[type="submit"]`
+→ Open dropdown         open_link    https://the-internet.herokuapp.com/dropdown
+→ Pick option 2         select       option `Option 2` / `#dropdown`
+→ Open upload           open_link    https://the-internet.herokuapp.com/upload
+→ Click choose file     click        `#file-upload`
+→ Upload sample         upload       From file URL `https://raw.githubusercontent.com/github/gitignore/main/README.md`
+→ Click upload          click        `#file-submit`
+→ Open inputs           open_link    https://the-internet.herokuapp.com/inputs
+→ Type number           insert_data  42 / `input[type=number]`
+→ Open frames           open_link    https://the-internet.herokuapp.com/iframe
+→ Switch to editor iframe  switch_frame  Switch Frame, Iframe selected, selector `iframe` or `#mce_0_ifr`
+→ Type in iframe        insert_data  `typed inside iframe` / `body#tinymce`
+→ Open checkboxes       open_link    https://the-internet.herokuapp.com/checkboxes
+→ Check box 1           click        `#checkboxes input:nth-of-type(1)`
+→ Open shadow           open_link    https://the-internet.herokuapp.com/shadowdom
+→ Type in shadow        insert_data  `typed in shadow` / `span[slot="my-text"]`
+```
+
+`SuperSecretPassword!` is the **published the-internet demo password**
+(public practice credential, not a secret). Do not treat it as a
+client password or redact it from the recipe.
+
+**Live drawer / wiring a weaker model must fill:**
+
+| Node | Live | Notes |
+|---|---|---|
+| Open login | `https://the-internet.herokuapp.com/login` | current tab (new-tab **off**) |
+| Type username | Insert Text `tomsmith` / `#username` | selector is the **INPUT**, not the label |
+| Type password | Insert Text `SuperSecretPassword!` / `#password` | public demo credential; INPUT selector |
+| Click login | `button[type="submit"]` | Left click |
+| Open dropdown | `https://the-internet.herokuapp.com/dropdown` | current tab |
+| Pick option 2 | Select Web Dropdown; option `Option 2`; selector `#dropdown` | needs the `<select>` selector **AND** the option text |
+| Open upload | `https://the-internet.herokuapp.com/upload` | current tab |
+| Click choose file | `#file-upload` | **required prior click** before Upload File |
+| Upload sample | File source **From file URL** `https://raw.githubusercontent.com/github/gitignore/main/README.md` | Detect errors **names the node** if File source is unset. **From folder path on your computer** is the Agent machine, not the creator browser. Prefer **From file URL** for a portable demo (gitignore README). Catalog tip: click the file input in the previous step. |
+| Click upload | `#file-submit` | submits the chooser |
+| Open inputs | `https://the-internet.herokuapp.com/inputs` | current tab |
+| Type number | Insert Text `42` / `input[type=number]` | number inputs still use Insert Text — no separate number block |
+| Open frames | `https://the-internet.herokuapp.com/iframe` | current tab |
+| Switch to editor iframe | Switch Frame, **Iframe** selected; selector `iframe` or `#mce_0_ifr` | docs require the iframe's selector, not just the Iframe radio. Docs say **Main frame**; live drawer may say **Main page**. Live playground default was **neither** (dead default). Set Iframe + selector before Insert Text |
+| Type in iframe | Insert Text `typed inside iframe` / `body#tinymce` | Switch Frame first, then Insert Text targets the inner document |
+| Open checkboxes | `https://the-internet.herokuapp.com/checkboxes` | current tab |
+| Check box 1 | Click `#checkboxes input:nth-of-type(1)` | native checkbox is a Click, not Insert Text |
+| Open shadow | `https://the-internet.herokuapp.com/shadowdom` | current tab |
+| Type in shadow | Insert Text `typed in shadow` / `span[slot="my-text"]` | slotted **light DOM** — a plain CSS selector reaches it. Do **not** always Write JS for /shadowdom. |
+
+**Upload File source is required.** Detect errors names the Upload
+sample node if File source is unset (playground default was
+**neither** selected). **From folder path on your computer** reads
+a path on the **Agent machine**, not the creator browser — a path
+that exists only on the builder's laptop fails on the agent.
+Prefer **From file URL** so the demo is portable.
+
+**Sticky notes.** Teaching notes that belong (place next to the
+node, after layout):
+
+- "Insert Text selector is the INPUT not the label"
+- "Select needs the <select> selector AND the option text"
+- "Upload File requires a prior click on the file input"
+- "Number inputs still use Insert Text"
+- "Switch Frame first, then Insert Text targets the inner document"
+- "Shadow DOM: Insert Text often fails. Write JS on shadowRoot."
+
+**Hard cases** (verified live on the same bot; Detect errors stayed green). Not a new pattern number. Number / iframe /
+upload URL sit after the upload spine; checkboxes / shadow
+were added after iframe.
+
+- **Number input.** Open `https://the-internet.herokuapp.com/inputs`.
+  Insert Text `42` / `input[type=number]`. Number inputs still
+  use Insert Text — there is no separate number block.
+- **Iframe.** Open `https://the-internet.herokuapp.com/iframe`.
+  Switch Frame first (**Iframe** selected — live playground
+  default was **neither**, a dead default). Docs require the
+  iframe's selector, not just the radio: `iframe` or
+  `#mce_0_ifr` on the-internet. Docs say **Main frame**; live
+  drawer may say **Main page**. Then Insert Text
+  `typed inside iframe` / `body#tinymce`. Insert Text targets
+  the inner document after the switch.
+- **Upload URL.** Upload sample File source = **From file URL**
+  `https://raw.githubusercontent.com/github/gitignore/main/README.md`
+  (portable gitignore README).
+- **Checkbox.** Open `https://the-internet.herokuapp.com/checkboxes`.
+  Click Web Element `#checkboxes input:nth-of-type(1)`. Native
+  checkboxes are Clicks, not Insert Text.
+- **Shadow DOM (inspect first).** Open
+  `https://the-internet.herokuapp.com/shadowdom`. Insert Text
+  `typed in shadow` / `span[slot="my-text"]`. On this page,
+  `<my-paragraph>`'s shadowRoot only contains
+  `<slot name="my-text">`. The visible text lives in the
+  **light DOM** as `<span slot="my-text">`. A plain CSS
+  selector reaches it. Do **not** teach "always Write JS for
+  /shadowdom" as a hard rule. Inspect whether the target is
+  slotted light DOM vs inside shadowRoot. If a future run
+  shows no text change (span is not an input), then Write JS
+  on `document.querySelector('my-paragraph').shadowRoot`
+  (browser, not Run locally).
+
+**Palette-drop quirk** (how these nodes were added live):
+drag from the right panel can leave a **pending ghost**; the
+next canvas click places the node and opens the drawer.
+
+## Pattern 9 — tabs + nested loops
+
+Live bot name is a label only. Do **not** treat a workflow id or node
+id as a required handle. Rebuild from this recipe; pick refs with
+**V / My references**, never paste another bot's `{id,name}` id.
+
+Official Switch or Close Tab + Open Link (new tab) plus official
+nested-loop pagination. No live workflow id required.
+
+```
+Open Link  https://the-internet.herokuapp.com/windows   (new tab OFF)
+→ Open Link  https://the-internet.herokuapp.com/windows/new   (new tab ON)
+→ Switch Tab  URL matching `/windows/new`
+→ Save WE  `h3` → Variables.new_window_title
+→ Switch Tab  URL matching `https://the-internet.herokuapp.com/windows`  (full URL)
+→ Close Tab  URL matching `/windows/new`
+→ Log  TAB TEST: opened, switched, closed
+→ Open Link  https://books.toscrape.com/   (new tab OFF)
+→ Start Repeat Pages  Standard, Fixed 2
+     body → Start Repeat Books  Standard, Fixed 3
+          body → Save WE  `ol.row > li:nth-child({loop_index}) h3 a`  Text → books.title
+          after → After Repeat → Click  `li.next > a`
+     after → After Repeat → Log  NESTED LOOP TEST: 2 pages x 3 books
+```
+
+**Tabs (official Switch or Close Tab + Open Link):**
+
+- Open Link has **open in new tab**. New tab stays in the background.
+  **Bring Pages to Front** is a **run setting** for watching those tabs,
+  not a block.
+- Switch or Close Tab: Action Switch/Close; Target Latest / Previous /
+  Next / **Tab URL matching** (full, partial, or `/regex/flags`; invalid
+  regex treated as literal) / Tab number.
+- Prefer **Tab URL matching**. Creation order ≠ visual order;
+  regular-browser mode cannot guarantee tab number.
+- Partial URL can over-match (`/windows` also matches `/windows/new`) —
+  be specific (full URL or tighter path). The recipe uses
+  `/windows/new` then the full `/windows` URL for that reason.
+- Close active tab → next-right, else next-left; last tab closes the
+  browser. Next browser action then needs Open Link or the run fails.
+
+**Nested loops (official):**
+
+- Outer Start Repeat = pages (Fixed N). Inner = items per page.
+- After Repeat of the **inner** Start Repeat → Click Next. After Repeat
+  wires DIRECTLY off its Start Repeat, never after Save siblings.
+- Loop type MUST be set (Standard vs Dynamic). Unset is a live footgun.
+- Standard = append new rows. Dynamic = iterate existing rows.
+- Continue-until-no-element needs a web-element action in the body; set
+  a repetition limit on long/endless lists. Skip-if-not-found /
+  Try-Catch swallows the end condition — then you need auto-scroll or
+  Break.
+- Book titles use CSS `:nth-child({loop_index})` on the repeating `li`
+  (Pattern 1). Not XPath. Not a virtualized-feed fix.
+
+## Pattern 10 — scheduled Dynamic scrape + keyword email
+
+Live bot name is a label only. Do **not** treat a workflow id or node
+id as a required handle. Rebuild from this recipe; pick refs with
+**V / My references**, never paste another bot's `{id,name}` id.
+Dropdown **labels can be stale** — the hidden numeric ref id is the
+truth, but still pick via My references.
+
+Generic recipe (deal-listing / BJJ-class; no live ids):
+
+```
+Open Link  <deal listing URL>
+→ Start Repeat  Dynamic  (existing products table; optional reverse / start-from / auto-continue / repetition limit)
+     body → Check / Save chain (name, description, price, image, dates)  CSS selectors
+          → boolean "exists" reset before loop, set inside, Break Repeat on dup
+          → date compare vs Variables.CurrentDate
+          → Write JS  getRef/setRef  date reformat
+          → Start Condition  Contains keywords  (nation / tatami / …)
+               → Send Notification  (no To: — account owner only; subject/body from {id,name} tokens)
+     after → After Repeat (optional)
+```
+
+**Live drawer / wiring a weaker model must fill:**
+
+| Node | Live | Notes |
+|---|---|---|
+| Open Link | `<deal listing URL>` | current tab; optional non-zero min/max sec (human-like delay) |
+| Reset exists | Update Data → Variables `exists` = false | boolean reset **before** the Dynamic loop |
+| Start Repeat | **Dynamic**, existing products table | optional **Newest rows first (reverse order)**, **Start from**, **Auto-continue from last row**, repetition limit. Pick the table via **My references**. |
+| Save chain | CSS (`.container-top h1`-class) | name / description / price / image / dates. Skip-if-not-found on. Prefer CSS. |
+| Dedupe | Start Condition on name + date | date compare `=` vs `{id, name: CurrentDate}` (Variables). Set `exists` true inside. **Break Repeat** on same-day dup. |
+| Write JS | `getRef` / `setRef` date reformat | cleanup a scraped date column; leave **Run locally** unchecked unless the script needs the agent machine |
+| Start Condition | **Contains keywords** | comma-separated brand tokens (`nation` / `tatami` / …). One Set Condition per keyword; both can fan into the same email. |
+| Send Notification | no **To:** field | account owner only. Subject/body from `{id, name}` tokens via **My references**. |
+| After Repeat | no drawer | optional; wires DIRECTLY off Start Repeat (second output). |
+
+**Scheduler UI (read-only facts).** Frequency **Every day** + **Select when** = Interval + unit **Hours** + interval N + optional **"Delay hour-based start by X minutes"** + optional **"Run within a time range"** + **Timezone**. Buttons: **REMOVE** / **RESCHEDULE**. Cadence and timezone are **per-bot** (sibling bots can differ). Linked agent + machine awake. **No catch-up** if the machine was asleep.
+
+**Deactivated nodes stay wired.** React-flow class `deactive`. The canvas **lies** about what runs — a Save / Write JS left in the chain may be skipped. Read the class, not just the edges.
+
+**Sticky notes are load-bearing** on client bots (selector history, de-dup rules, branch intent). Place them next to the node they document.
+
+**CSS in production.** Client bots already use CSS (`.container-top h1`, `[data-product-text=…]`). Matches the 1.3.14 CSS-first rule.
+
+## Pattern 11 — webhook + HTTP work queue + branch rejoin
+
+Live bot name is a label only. Do **not** treat a workflow id or node
+id as a required handle. Rebuild from this recipe; pick refs with
+**V / My references**, never paste another bot's `{id,name}` id.
+
+Generic recipe (job-queue / Upwork-class; no live ids):
+
+```
+[Webhook active] inbound POST  https://webhook.zerowork.io/trigger/<token>
+→ Send HTTP Request GET  <queue API>
+     HEADER Authorization: Bearer {id,name}   (secret is a variable, never a literal)
+     SAVE RESPONSE  Variables + Nested record path(s)  e.g. data.records[0]['fields']['Job URL']
+→ Open Link  {Job URL}
+→ Click Apply
+→ Check Web Element
+     Found → optional extra click
+     Not Found → skip
+     both rejoin → Insert Text cover letter  (CSS textarea; typing-speed slider, not instant)
+→ Send HTTP Request POST  <completion webhook>  empty body ok
+```
+
+**Live drawer / wiring a weaker model must fill:**
+
+| Node | Live | Notes |
+|---|---|---|
+| Webhook trigger | `https://webhook.zerowork.io/trigger/<token>` | toggle **active**. Copy icon. Delete = rotate. No method picker (inbound POST). A bot can **HAVE** a webhook configured but **inactive**. |
+| Send HTTP GET | `<queue API>` | HEADERS `Authorization: Bearer {id, name}` — secret is a **variable**, never a literal. SAVE RESPONSE → Variables; **multiple Nested record paths** (e.g. `data.records[0]['fields']['Job URL']`). Status-code optional. Empty SAVE RESPONSE is still a no-op (Pattern 5 footgun). |
+| Open Link | `{id, name: Job URL}` | pick via **My references** |
+| Click Apply | site Apply control | Left click |
+| Check Web Element | optional extra control | Found → extra click; Not Found → skip. **Both rejoin** at Insert Text (not only dead-end). |
+| Insert Text | CSS textarea (`.ai-cover-letter-area textarea`-class) | **Insert instantly** unchecked; typing-speed slider **PRO → VERY SLOW** (human-like). **Use spintax** is independent of the slider. |
+| Send HTTP POST | `<completion webhook>` | empty body `{}` is ok. Marks the queue item done. |
+
+**Webhook UI.** Separate modal: active/inactive toggle; one URL; copy; delete=rotate. Official docs also mention GET; the live modal has **no method picker** (inbound POST). Linked agent + machine awake.
+
+**HTTP SAVE RESPONSE.** Multiple **Nested record path** entries; status-code optional; empty SAVE RESPONSE is still a no-op (Pattern 5 footgun).
+
+**Found / Not Found can rejoin** at a later node (not only dead-end).
+
+## Pattern 12 — large branched form + webhook (possibly inactive)
+
+Live bot name is a label only. Do **not** treat a workflow id or node
+id as a required handle. Rebuild from this recipe; pick refs with
+**V / My references**, never paste another bot's `{id,name}` id.
+
+Short recipe (quote-form / Alcance-class). **Do not dump a 146-node graph.**
+
+```
+[Webhook configured, possibly inactive]  https://webhook.zerowork.io/trigger/<token>
+→ Open Link  <form landing URL>
+→ Start Condition  single vs multi  → two Set Conditions
+→ Check Web Element  coupon / extra control  → Found / Not Found
+→ Start Condition  AM / PM  (coupon on home page vs later page)
+→ Check Web Element × N  SKU probes  (`[data-product-text=…]` CSS)
+     Found → stamp "SKU found" variable
+     Not Found → continue chain
+→ Write JS  random pick + locale math (`toLocaleString`)
+→ Insert Text  form fields  (spintax; CSS `#emailP`-class)
+→ Apply Regex  extract into a results table  (`{id, name}` source/dest via My references)
+```
+
+**What to copy, not the node dump:**
+
+- **AM/PM branches** via Start Condition + Set Conditions; sticky notes carry which page gets the coupon.
+- **Found / Not Found SKU probes** chained over N product cards. CSS `[data-product-text=…]`.
+- **Spintax** on Insert Text (independent of instant vs slider).
+- **Write JS** random pick (`querySelectorAll` + `Math.random`) and locale money math (`toLocaleString`). Persist with `setRef` via **My references** — never paste another bot's `ref_id`.
+- **Apply Regex** into a results table (read and write the same `{id, name}` column).
+- **Deactivated alternates** stay wired (`deactive`) — canvas lies about what runs.
+- **Sticky notes are load-bearing** (selector history: new vs old; branch intent).
+- Webhook may be **configured but inactive**. No scheduler required.
+
+## Pattern 13 — LinkedIn outreach DM + daily cap
+
+Live bot name is a label only. Do **not** treat a workflow id or node
+id as a required handle. Rebuild from this recipe; pick refs with
+**V / My references**, never paste another bot's `{id,name}` id.
+Dropdown **labels can be stale** — the hidden numeric ref id is the
+truth, but still pick via My references. **No LinkedIn API** — CSS-first
+selectors only.
+
+Generic recipe (connections-queue / daily-cap DM; no live ids):
+
+```
+Reset {id, name: CurrentMessageCount} = 0
+→ Start Repeat  Dynamic  (connections table; pick via My references)
+     → blank-row guard  Start Condition on URL column
+          NOT_EXISTS ("Data not found / is empty") → delete_table_data  "Delete current row in a loop"
+          ELSE / found → continue
+     → message-cap  Start Condition on {id, name: CurrentMessageCount}
+          EQUALS {id, name: MessageCount} → Break Repeat
+          ELSE ("if no other condition is met") → continue
+     → Check leftover convo  [data-test-icon="close-small"]
+          Found → Click same selector (close)
+          Not Found → continue
+          both rejoin
+     → Click  main button[aria-label*="Message"]
+     → Start Try-Catch  ("Save error message to" connections.Error)
+          try → Click  div[role="dialog"] div[contenteditable="true"]
+             → Insert Text  same selector
+                  content: Hi {id, name: First Name}, {id, name: Message}
+                  Use spintax ON, typing slider ~AVERAGE (not Insert instantly)
+             → Click  div[role="dialog"] footer button[type="submit"]
+             → Number Operations  Add 1  → {id, name: CurrentMessageCount}
+             → delete_table_data  "Delete current row in a loop"
+          catch → (error text already on the row; do not delete)
+          both rejoin → Delay random 5–10s
+```
+
+**Live drawer / wiring a weaker model must fill:**
+
+| Node | Live | Notes |
+|---|---|---|
+| Reset count | Update Data → Variables `CurrentMessageCount` = 0 | before the Dynamic loop |
+| Start Repeat | **Dynamic**, connections table | pick via **My references**. Optional reverse / start-from / auto-continue / repetition limit. |
+| Blank-row guard | Start Condition on URL column | **NOT_EXISTS** = "Data not found / is empty" → `delete_table_data` mode **"Delete current row in a loop"**. Junk rows never open a profile. |
+| Message-cap | Start Condition on `CurrentMessageCount` | Set Condition **EQUALS** `{id, name: MessageCount}` → **Break Repeat**. Set Condition type **ELSE** ("if no other condition is met") continues. Cap lives in a variable, not the graph. |
+| Increment | Number Operations **Add** 1 | write back to `{id, name: CurrentMessageCount}` **after** a successful send (inside try). |
+| Leftover convo | Check `[data-test-icon="close-small"]` | Found → Click same selector. Both branches rejoin at the Message button. |
+| Message button | Click `main button[aria-label*="Message"]` | CSS-first. No LinkedIn API. |
+| Composer | Insert Text `div[role="dialog"] div[contenteditable="true"]` | `Hi {id, name: First Name},\n\n{id, name: Message}` via **My references**. **Use spintax ON**. Typing slider ~AVERAGE (not Insert instantly). Per-node min/max 3–8 s. |
+| Send | Click `div[role="dialog"] footer button[type="submit"]` | CSS submit in the dialog footer. |
+| Try/Catch | Start Try-Catch around the DM | drawer **"Save error message to"** the current row's `Error` column. Catch may **rejoin** the same Delay as the happy path (outreach style). Do **not** delete the row on catch — retry later. |
+| Consume queue | `delete_table_data` **"Delete current row in a loop"** | only on success. The run list shrinks; re-runs never re-message. |
+| Delay | random 5–10 s | human-like gap between contacts. |
+
+**ELSE is a real comparison type.** Set Condition type **ELSE** ("if no other condition is met") is the continue branch of a message-cap (or any two-way test). Always pair it with the specific operator (EQUALS / Contains keywords / …).
+
+**Idempotent queue.** `"Delete current row in a loop"` after a successful DM is the outreach equivalent of a status column — the table *is* the queue.
+
+**CSS-first. No LinkedIn API.**
+
+## Pattern 14 — Dynamic enrich RUN LIST
+
+Live bot name is a label only. Do **not** treat a workflow id or node
+id as a required handle. Rebuild from this recipe; pick refs with
+**V / My references**, never paste another bot's `{id,name}` id.
+
+Generic recipe (profile enrich / RUN LIST; no live ids):
+
+```
+Start Repeat  Dynamic  (RUN LIST table; pick via My references)
+  → Open Link  {id, name: profile URL}
+  → Keyboard Space  (force lazy sections to render)
+  → for each optional section:
+       Check Web Element
+         Found (a)  main-profile DOM → Write JS scrape → setRef substring(0,50000)
+         Found (b)  "show all …" page → Write JS scrape → Click Back to profile
+         Not Found → skip that section
+  → Apply Regex  /^(\w+)/  Extract matches  → first name
+  → Write JS  extractLastName()  (skip middle initials /^\w\.$/)
+→ After Repeat → HTTP GET  <done webhook>
+     SAVE RESPONSE required or the call is a no-op
+```
+
+**Live drawer / wiring a weaker model must fill:**
+
+| Node | Live | Notes |
+|---|---|---|
+| Start Repeat | **Dynamic**, RUN LIST table | one Open Link per existing row. Pick the table via **My references**. |
+| Open Link | `{id, name: profile URL}` | current tab. |
+| Keyboard Space | key = **Space** | forces lazy-loaded profile sections to render before scrape. Not a scroll-to-end substitute for virtualized feeds (those still use PageDown / Write JS). |
+| Optional-UI (a)/(b) | Check Web Element per section | **(a)** scraper writes the main-profile DOM. **(b)** clicks "show all …", scrapes the detail page, then Click `button[aria-label="Back to the main profile page"]` (or Go Back) to rejoin. Both paths write the same column. |
+| Write JS scrape | `querySelectorAll` + concatenate `textContent` | `.substring(0, 50000)` then `setRef` — **50k cell-size guard** (native and Sheets max chars/cell). Resolve `ref_id` via `zw.getTaskbotInfo()` / **My references**, never another bot's table id. Leave **Run locally** unchecked. |
+| Name split | Apply Regex + Write JS | Regex mode **Extract matches** `/^(\w+)/` → first name. JS `extractLastName()` splits on spaces and skips middle initials (`/^\w\.$/`). |
+| After Repeat | HTTP GET `<done webhook>` | loop-exit "done" signal. Placeholder URL only — never bake a vendor webhook. SAVE RESPONSE or the GET is a no-op (Pattern 5 footgun). Secrets as `Bearer {id, name}`. |
+| Test sub-flow | left **deactivated** | Delete-all-rows → copy URLs from a source table. Sticky: "For testing ONLY. Deactivate and detach when running in production." **Destructive nodes left deactivated = production hygiene.** |
+
+**50k cell-size guard.** Every section scraper truncates with `.substring(0, 50000)` before `setRef`. Matches the platform max chars/cell.
+
+**Test sub-flow stays on canvas but deactivated** (`deactive`). Do not delete it — it is living documentation. Do not leave it active in production.
+
+## Pattern 15 — Facebook group scrape + criteria reply
+
+Live bot name is a label only. Do **not** treat a workflow id or node
+id as a required handle. Rebuild from this recipe; pick refs with
+**V / My references**, never paste another bot's `{id,name}` id.
+
+Generic recipe (group-feed scrape + criteria DM; no live ids):
+
+```
+# Scrape
+Clear temp posts table  (delete_table_data  Delete all rows)
+→ Reset {id, name: index} = 0
+→ Start Repeat  Dynamic  (driver table: groupUrl + isActive)
+     → Start Condition  isActive  EQUALS true
+          → Open Link  {id, name: groupUrl}
+          → Write JS  one node does everything:
+               rows = [role="feed"]  or  [role="feed"] [aria-posinset]
+               poster h3/h2, profile object a[attributionsrc]
+               expand See more  (div[role="button"] text contains "See more")
+               post  [data-ad-rendering-role="story_message"]
+               post URL  a[href*="posts"]  (fallback [dir="ltr"] a groups)
+               setRef({…, appendIndex: i})   + persist index cursor
+               await log({message}) ; await delay({min,max})
+               JS scroll  (setInterval / processRows × N)
+               sanitise post text  .replace(/"/g,"'")
+→ After Repeat
+→ remove_duplicate_rows  key column "post"  (Preserve newest off unless you want newest)
+→ Start Repeat  Dynamic  (Sheets-backed posts table — no Sheets *block* required)
+
+# Reply
+→ reset {id, name: doRespond}=false  and  {id, name: response}=empty
+→ HTTP POST  <criteria webhook>  body {"post": "{id, name: post}"}
+     SAVE RESPONSE  nested paths  doRespond + response
+→ Start Condition  doRespond  Contains keywords  true
+     → Open Link  {id, name: posterProfileUrl}
+     → Click  [aria-label="Message"][role="button"]
+     → Click  [aria-label="Thread composer"] [aria-label="Message"][role="textbox"]
+     → Insert Text  same selector  {id, name: response}  (spintax ON, ~AVERAGE)
+     → Keyboard Enter   (sends the DM — no submit button)
+     → HTTP POST  <respondedTo webhook>
+```
+
+**Live drawer / wiring a weaker model must fill:**
+
+| Node | Live | Notes |
+|---|---|---|
+| Driver table | columns `groupUrl` + `isActive` | **isActive driver-table gating** — Start Condition EQUALS `true` lets the client enable/disable targets from the table instead of editing the bot. |
+| Scrape | one Write JS | `[role="feed"]` / `[role="feed"] [aria-posinset]`. Expand "See more". `story_message`. `setRef` **appendIndex**. Persist an `index` variable as the cursor across scroll passes. `await log({message})`. `await delay({min,max})` (official unit ms). JS infinite-scroll (`setInterval` + N `processRows` passes). |
+| Dedup | `remove_duplicate_rows` | **key column** `post`. **Preserve newest** off keeps oldest (default). Place **after** the scrape loop. |
+| Sheets-backed table | Dynamic loop | A **Sheets-backed table can exist without a Sheets *block***. Loop it like a native table. Pick via **My references**. |
+| Criteria round-trip | HTTP POST `<criteria webhook>` | body `{"post": "{id, name: post}"}`. SAVE RESPONSE **two Nested record paths** `doRespond` + `response` into Variables. Reset both at the top of every iteration (no carry-over). |
+| Gate | Start Condition + **Contains keywords** `true` | only then open the poster's profile. |
+| Facebook DM | profile → Message button → Thread composer | Insert Text then **Keyboard Enter to send** (no submit button). CSS-first. |
+| Mark done | HTTP POST `<respondedTo webhook>` | keeps external state in sync. Placeholder URL only. Secrets as `Bearer {id, name}`. |
+
+**JS multi-row write.** `setRef({ ref_id, name, value, appendIndex: i })` appends N rows in one Write JS. Persist `index` via `setRef` so the next scroll pass continues. Unprefixed `log()`, `delay()`, `setRef()` still work; prefer `zw.*` in new scripts. Resolve `ref_id` via `zw.getTaskbotInfo()` / **My references**.
+
+**Deactivated no-code twin** of the JS scraper may stay on canvas as documentation (`deactive`).
+
+## Pattern 16 — Instagram hashtag engage + vision comment
+
+Live bot name is a label only. Do **not** treat a workflow id or node
+id as a required handle. Rebuild from this recipe; pick refs with
+**V / My references**, never paste another bot's `{id,name}` id.
+API keys live in Variables and inject as `Authorization: Bearer {id, name}`
+— never a literal.
+
+Generic recipe (hashtag grid → vision comment → optional profile; no live ids):
+
+```
+Open Link  <instagram home>
+→ Start Repeat  Dynamic  (hashtag table)
+     → Search  insert #{id, name: Tag}  → Keyboard Enter  → first result
+     → Start Repeat  "Count elements matching selector"
+          Lead selector  section main a[href*="/p"]
+        OR  Standard  Fixed 1000  + Auto-scroll ON
+     → two-level dedupe
+          Dynamic loop posts table  + boolean PostExists  + Break Repeat
+          Dynamic loop users table  + boolean UserExists  + Break Repeat
+     → Save WE  [role="dialog"] img   Save as Custom attribute  src
+     → HTTP POST  <vision API>
+          HEADER Authorization: Bearer {id, name}
+          body image_url = {id, name: Content URL}
+          SAVE RESPONSE  nested path  choices[0].message.content
+          (the JSON path can become the variable name)
+     → Insert Text  textarea[aria-label*="Add a comment"]
+     → Open Link  profile  (Open in a new tab ON)
+          → Switch or Close Tab  Switch / Latest
+          → work
+          → Switch or Close Tab  Close / Latest
+     → Write JS  location.reload(true)
+Follow / Post comment / Send Message  often left deactivated on purpose
+```
+
+**Live drawer / wiring a weaker model must fill:**
+
+| Node | Live | Notes |
+|---|---|---|
+| Hashtag loop | Dynamic, hashtag table | search box `input[aria-label="Search input"]`; type `#{id, name: Tag}` via **My references**. |
+| Grid loop | **"Count elements matching selector"** + **Lead selector** `section main a[href*="/p"]` | first-class Standard sub-mode. Alternative: Standard **Fixed 1000** + **Auto-scroll ON** to drive the grid. |
+| Two-level dedupe | Dynamic loop over dest table | Start Condition on PostID / UserID + boolean `PostExists` / `UserExists` + **Break Repeat**. Reset the boolean before each inner loop. |
+| Vision image | Save WE **Custom attribute** `src` | selector `[role="dialog"] img` → Content URL column. **Custom attribute src** is how you feed a vision model without downloading the file. |
+| Vision HTTP | POST `<vision API>` | `Authorization: Bearer {id, name}` (variable, never a literal). SAVE RESPONSE nested path `choices[0].message.content`. **The JSON path can become the variable name** — the dest token is `{id, name: choices[0].message.content}`. Copy into the posts table with Update Data, then Insert Text. |
+| Comment | Insert Text `textarea[aria-label*="Add a comment"]` | spintax ON, ~AVERAGE. **Click Post often left deactivated** (production hygiene). |
+| Profile tab | Open Link **open in a new tab ON** | **Switch or Close Tab** Action=Switch / Target=**Latest**, then work, then Action=Close / Target=**Latest**. Keeps the post grid intact. |
+| Recover feed | Write JS `location.reload(true)` | after closing the profile tab. |
+| Danger flags | Follow / Post / Send | **Destructive nodes left deactivated = production hygiene.** The canvas is armed except for the final send. Class `deactive` — the canvas lies about what runs. |
+
+**Count elements matching selector** is a Standard loop mode: the **Lead selector** is the repeating card (`section main a[href*="/p"]`). Do not invent a Dynamic loop over a CSS selector.
+
+**Custom attribute `src`** on a dialog `img` is the vision-input pattern. Pair with HTTP SAVE RESPONSE nested path `choices[0].message.content`.
+
+**Keyboard Enter send** is the Facebook Thread-composer pattern (Pattern 15). Instagram comment uses a Post button (often deactivated); Instagram DM uses a Keyboard send that is also often left deactivated.
+
+## Pattern 17 — two-phase collect then Dynamic enrich (no Run TaskBot)
+
+Live bot name is a label only. Do **not** treat a workflow id or node
+id as a required handle. Rebuild from this recipe; pick refs with
+**V / My references**, never paste another bot's `{id,name}` id.
+
+This client's live bots have **zero** `run_taskbot` nodes. The live
+substitute for parent/child is a **single bot, two phases**: Standard
+collect into a table, then After Repeat starts a Dynamic enrich over
+the same table. A variable-only bot can look child-shaped; nothing
+calls it. Catalog fields for Run TaskBot remain — do not invent a
+client recipe.
+
+```
+delete_table_data  Delete all rows   (fresh snapshot; on a Sheets-linked table this clears the sheet)
+→ Open Link  <list URL>
+→ Start Repeat  Standard  Count elements matching selector
+     Lead selector  a[href*=products]
+     body → Save WE  a[href*=products] >> nth={loop_index,0}   (and siblings)
+            Record Date  Calendar / MM/DD/YYYY / Today → Date Added
+     after → After Repeat
+→ Start Repeat  Dynamic  (same table, via My references)
+     body → Open Link  {id, name: URL}
+          → Check / Save / Write JS  (detail enrich)
+```
+
+Optional cheap "run finished" signal (no webhook): After Repeat →
+Send Notification to the **account owner** (**no To:** field).
+Subject/body take `{id, name}` + emoji. Same block also works as a
+per-row alert **inside** the loop.
+
+**Live drawer / wiring a weaker model must fill:**
+
+| Node | Live | Notes |
+|---|---|---|
+| delete_table_data | **Delete all rows** | **Truncate-then-refill** — each run is a fresh snapshot. Contrast Pattern 13 **Delete current row in a loop** (queue shrinks). On a Sheets-linked table this clears the spreadsheet (Pattern 18). |
+| Start Repeat (phase 1) | Standard, **Count elements matching selector** | **Lead selector** `a[href*=products]`. Live confirmation of the CSS-first official form. |
+| Save WE | `a[href*=products] >> nth={loop_index,0}` | Same lead selector + **`>> nth={loop_index,0}`** (0-based; `0` = first). Siblings reuse the lead + nth. Skip-if-not-found ON. Save-as Link / Text. Save-to table **or Variables**. |
+| Record Date | Calendar date, MM/DD/YYYY, **Today** | **insert_date as a run stamp** into a Date Added column. |
+| After Repeat | no drawer | Off the Standard opener. Starts phase 2 (or the email digest). |
+| Start Repeat (phase 2) | **Dynamic**, same table | Open Link `{id, name: URL}` then detail Save/JS. Pick the table via **My references**. |
+| Check | Found / Not Found | **Dead-end = skip row** (one side has no outgoing edge). **Inverted check:** presence of a waitlist `input[placeholder=Email]` means unavailable — Found is the skip. |
+| Send Notification | Subject + body, **no To:** | Account owner only. Loop-exit digest = cheap "run finished". Per-row alert stays inside the loop. |
+| Write JS / Regex | twins | A **deactivated** Apply Regex (Extract matches) may sit beside the live Write JS as documentation (`deactive`). Do **not** hard-code `tableRefId` or a test URL in Write JS — resolve via `zw.getTaskbotInfo()` / **My references**, and use the URL you just saved. |
+
+**`>> nth={loop_index,0}`** with a lead selector is the live client
+confirmation of the CSS-first official form (lists page also writes
+`{loop_index,1}`; Standard Loop also writes `>> nth={loop_index}`).
+0-based: `0` = first.
+
+**Two delete modes.** Truncate-then-refill (Delete all rows first) vs
+Delete current row in a loop (Pattern 13 queue). Do not mix them up.
+
+**Dead-end Found/Not Found = skip row.** One side has no outgoing
+edge. The inverted waitlist check is the same wiring: Found (email
+input present) is the skip; Not Found continues to the buyable path.
+
+**Honest hole (this client set).** Run TaskBot, cookies/proxies/Launch
+Browser, and file columns / Upload File / Save File are **absent from
+this client's live bots**. Catalog fields remain; do not invent a
+client recipe. A variable-only bot can look like a Run TaskBot child
+(whoever sets the input variable drives it) — nothing calls it.
+
+## Pattern 18 — Sheets is a table property, not a block
+
+Live bot name is a label only. Do **not** treat a workflow id or node
+id as a required handle. Rebuild from this recipe; pick refs with
+**V / My references**, never paste another bot's `{id,name}` id.
+
+There is **no Google Sheets palette node**. Sheets is a **property of
+the table**, set in the sidebar — not a building block.
+
+**Sidebar → Tables:**
+- Grey grid icon = plain native table
+- **Green Sheets icon** = linked table
+- Row kebab: **Edit Google Sheets link** / **Remove from this TaskBot** /
+  **Delete table** / **About this table**
+- About this table shows Table ID, Created, **Google Sheets URL**,
+  **Selected sheet** (worksheet tab), and **Used in TaskBots**
+
+Ordinary `save` / `update_variable` / `delete_table_data` write through
+and sync to the chosen worksheet. A node named "Delete Spreadsheet Data" is just `delete_table_data` **Delete all rows** on the linked
+table — it clears the Google Sheet.
+
+A bot can **mix** plain native tables and Sheets-linked tables in the
+same graph. Loop either kind with Start Repeat Dynamic. Pick via
+**My references**. Never bake a Sheets URL into the skill or a
+rebuild.
+
+**Variable-in-selector + cross-table copy** (same class of crawl):
+
+```
+update_variable  CurrentURL := ""     (reset each iteration)
+update_variable  CurrentSubSectionID := ""
+→ Save WE  <lead> >> nth={loop_index,0}  as Link  → **Variables** CurrentURL
+→ Apply Regex  Extract matches  /#(.*)/  on {id, name: CurrentURL}
+     → variable CurrentSubSectionID
+→ Check  selector  {id, name: CurrentSubSectionID} + ul + p a
+```
+
+The extracted hash **is** the id selector; sibling combinators walk
+from it. **Variable interpolated inside a CSS selector** is first-class.
+Reset the variables at the top of each iteration so a stale value
+cannot leak into the next selector.
+
+Save WE **Save to: Variables** (not only a table column).
+`update_variable` doubles as a **cross-table cell copier**
+(dest column := `{id, name: Section}` from another table).
+
+**Tab-number switching** (Tab number **2**, work, then back to Tab
+number **1**) exists on this class of crawl. Still **prefer Tab URL
+matching** (creation order ≠ visual order; regular-browser mode
+cannot guarantee tab number). Pattern 9.
+
+## Pattern 19 — HTTP status-only link check
+
+Live bot name is a label only. Do **not** treat a workflow id or node
+id as a required handle. Rebuild from this recipe; pick refs with
+**V / My references**, never paste another bot's `{id,name}` id.
+
+HTTP SAVE RESPONSE has **three independent slots**:
+1. Save response body (optional) → table / Variables
+2. Nested record path(s) (optional) + "+ ADD MORE RECORD PATHS"
+3. **Save response status code** (optional) → table column
+
+Filling **only** the status-code slot is intentional (a link-rot
+checker with zero JS). That is **not** Pattern 5's accidental no-op
+(body + nested + status all empty).
+
+```
+Start Repeat  Dynamic  (urls table, via My references)
+  → Send HTTP Request  GET  {id, name: URL}
+       SAVE RESPONSE: only **Save response status code** → Status column
+       (body and nested paths empty — this is intentional)
+  → Start Condition  Status  EQUALS  200
+       → Open Link  {id, name: URL}  → Check / Save  (optional detail)
+```
+
+The Start Condition drawer says: "To add conditions, connect this
+building block to one or more Set Condition building blocks."
+
+**Variable-only bot + outbound webhook** (same HTTP block, no table):
+
+```
+update_variable  {id, name: transcript} := empty
+→ Open Link  <watch URL with {id, name: videoId}>
+→ Click  (expand / show transcript)
+→ Write JS  querySelectorAll → join → replace(/"/g,'') → setRef transcript
+→ Send HTTP Request  POST  <outbound webhook>
+     body  {"transcript": "{id, name: transcript}", "videoId": "{id, name: videoId}"}
+```
+
+Quote-stripping in JS keeps the hand-written JSON valid. Auth is
+often the webhook id itself — never bake a vendor webhook token.
+Looks child-shaped (whoever sets `videoId` drives it); no parent
+`run_taskbot` exists in this client set.
+
+Click drawer options (both often OFF): **Perform right-click** and
+**Use human-like clicking**.
+
 ## Node Playground — living coverage map
 
 Live bot name is a label only. Do **not** treat a workflow id or node
@@ -435,10 +1119,22 @@ Full type table: [node-types.md](node-types.md).
 Keep a set of demo bots in a scratch/test account as living documentation:
 
 - **Paginated scraper** — Pattern 2 (nested loops), the canonical pagination build.
+- **Tabs + nested loops** — Pattern 9 (the-internet windows + books.toscrape). Live bot name is a label only. Do **not** treat a workflow id or node id as a required handle.
 - **Advanced logic** — Pattern 4 (try-catch + regex + condition branches, full pipeline).
 - **Control twin** — the same failing click WITHOUT try-catch (errors by design —
   the A/B proof pair for the try-catch bot).
 - **HTTP + math pipeline** — Pattern 5, browserless.
+- **Form input / select / upload** — Pattern 8 (the-internet login + dropdown + file upload + number / iframe / checkbox / shadow hard cases). Live bot name is a label only. Do **not** treat a workflow id or node id as a required handle.
+- **Scheduled Dynamic scrape + keyword email** — Pattern 10 (deal-listing class). Live bot name is a label only. Do **not** treat a workflow id or node id as a required handle.
+- **Webhook + HTTP work queue + branch rejoin** — Pattern 11 (job-queue class). Live bot name is a label only. Do **not** treat a workflow id or node id as a required handle.
+- **Large branched form + webhook (possibly inactive)** — Pattern 12 (quote-form class). Short recipe, not a node dump. Live bot name is a label only. Do **not** treat a workflow id or node id as a required handle.
+- **LinkedIn outreach DM + daily cap** — Pattern 13 (connections-queue class). CSS-first, no LinkedIn API. Live bot name is a label only. Do **not** treat a workflow id or node id as a required handle.
+- **Dynamic enrich RUN LIST** — Pattern 14 (profile-enrich class). Optional-UI (a)/(b) scrapers, 50k cell-size guard. Live bot name is a label only. Do **not** treat a workflow id or node id as a required handle.
+- **Facebook group scrape + criteria reply** — Pattern 15 (group-feed class). isActive gating, Keyboard Enter send. Live bot name is a label only. Do **not** treat a workflow id or node id as a required handle.
+- **Instagram hashtag engage + vision comment** — Pattern 16 (hashtag-grid class). Count elements matching selector, Custom attribute src. Live bot name is a label only. Do **not** treat a workflow id or node id as a required handle.
+- **Two-phase collect then Dynamic enrich** — Pattern 17 (no Run TaskBot). Lead `a[href*=products]` + `>> nth={loop_index,0}`; loop-exit email digest. Live bot name is a label only. Do **not** treat a workflow id or node id as a required handle.
+- **Sheets as a table property** — Pattern 18 (sidebar green Sheets icon; mix native + linked). Live bot name is a label only. Do **not** treat a workflow id or node id as a required handle.
+- **HTTP status-only link check** — Pattern 19 (Save response status code only). Live bot name is a label only. Do **not** treat a workflow id or node id as a required handle.
 - **Node Playground** — living coverage map of palette types (not a client bot).
   Live: 65 canvas nodes (40 named/real, 25 dead `react-flow__node-default` husks, no label).
   Wrong type strings render as husks — expected here. One empty sticky ("Write a note...").
