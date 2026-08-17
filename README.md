@@ -1,120 +1,100 @@
 # zerowork-utils
 
-This repo is the **Ubuntu Chrome/ZeroWork installer** only.
+Ubuntu VPS installer: XFCE, Chrome, and the ZeroWork agent as a systemd service.
 
-Agent skills (ZeroWork TaskBot builder, ZeroWork → Playwright, and later n8n) moved to the private repo **automation-skills**.
+Agent skills (TaskBot builder, ZeroWork → Playwright, n8n) live in the private repo **automation-skills**.
 
-`ubuntu-chrome-zerowork-installation.sh` — a one-command installer that sets up an Ubuntu VPS with a full desktop environment, Google Chrome, and the ZeroWork agent.
+[YouTube demo](https://youtu.be/_uhx_y_ZvGM). Adapted from [DEPINspirationHUB](https://github.com/depinspirationhub/ubuntu-desktop/blob/main/ubuntu-desktop.sh); Dennis modified it for ZeroWork.
 
-## Install ZeroWork on Ubuntu (VPS)
-
-This guide provides step-by-step instructions on how to execute the ZeroWork installation script on your Ubuntu VPS. This automated script will set up a complete desktop environment with Google Chrome and ZeroWork.
-
-### Video Demonstration
-
-For a visual walkthrough of this installation process, check out this [YouTube demonstration video](https://youtu.be/_uhx_y_ZvGM) which shows the entire process in action.
-
-### Credit
-
-This installation script is adapted from the original work by [DEPINspirationHUB](https://github.com/depinspirationhub/ubuntu-desktop/blob/main/ubuntu-desktop.sh). I've modified it specifically for ZeroWork installation while maintaining the core functionality.
-
-### Running the Installation Script
-
-#### The Installation Command
-
-Copy and paste the following command into your SSH terminal:
+## Install
 
 ```bash
 wget https://raw.githubusercontent.com/dennisrongo/zerowork-utils/refs/heads/master/ubuntu-chrome-zerowork-installation.sh && chmod +x ubuntu-chrome-zerowork-installation.sh && ./ubuntu-chrome-zerowork-installation.sh 1.1.66
 ```
 
-#### Understanding the Command
+Swap `1.1.66` for another agent version if needed. Type `y` on the disclaimer, then create an RDP username and password (typed twice, hidden).
 
-This command performs three actions in sequence:
+## What you get
 
-1. `wget https://raw.githubusercontent.com/dennisrongo/zerowork-utils/refs/heads/master/ubuntu-chrome-zerowork-installation.sh`
-   - Downloads the installation script from the GitHub repository
+- System update
+- XFCE
+- XRDP on 3389, enabled on boot
+- Google Chrome
+- ZeroWork agent (version you pass)
+- Xvfb + systemd service `zerowork` so the agent starts on boot and restarts after a crash
 
-2. `chmod +x ubuntu-chrome-zerowork-installation.sh`
-   - Makes the downloaded script executable (grants permission to run the script)
+## After install
 
-3. `./ubuntu-chrome-zerowork-installation.sh 1.1.66`
-   - Executes the script with version 1.1.66 of ZeroWork as a parameter
-   - You can replace "1.1.66" with a different version number if needed
+RDP to the VPS IP with the user you created (Windows Remote Desktop, Mac Microsoft Remote Desktop, Linux Remmina).
 
-### Installation Process Walkthrough
+The agent is already running. Do not launch a second copy from Applications. The tray icon will not appear in RDP (virtual display :99). Expected.
 
-#### 1. Disclaimer Acknowledgment
+```bash
+sudo systemctl status zerowork
+journalctl -u zerowork -f
+curl http://localhost:9990
+```
 
-After running the command:
+`curl` should return the agent-is-running message.
 
-- A disclaimer will appear, explaining potential risks
-- Type `y` and press Enter to agree and continue
-- If you type anything else, the installation will abort
+## Existing VPS
 
-#### 2. System Updates
+Do not re-run the full installer (it creates another user). Use this instead (replace the username):
 
-- The script will update your system packages
-- You'll see package lists being refreshed and upgrades being applied
-- This may take several minutes depending on your system
+```bash
+EXISTING_USER="your-rdp-user"
 
-#### 3. Desktop Environment Installation
+sudo apt install xvfb x11-utils -y
 
-- XFCE desktop environment will be installed
-- You'll see progress as packages are downloaded and configured
+sudo tee /usr/local/bin/zerowork-agent-start.sh > /dev/null <<'EOF'
+#!/bin/bash
+export DISPLAY=:99
+if ! xdpyinfo -display :99 >/dev/null 2>&1; then
+    Xvfb :99 -screen 0 1440x900x24 -ac +extension GLX +render -noreset &
+fi
+for i in $(seq 1 20); do
+    if xdpyinfo -display :99 >/dev/null 2>&1; then
+        break
+    fi
+    sleep 0.5
+done
+if ! xdpyinfo -display :99 >/dev/null 2>&1; then
+    echo "Error: Xvfb display :99 did not become ready."
+    exit 1
+fi
+exec /opt/ZeroWork/zerowork --no-sandbox
+EOF
 
-#### 4. Remote Desktop Configuration
+sudo chmod +x /usr/local/bin/zerowork-agent-start.sh
 
-- XRDP (Remote Desktop Protocol) service is installed and configured
-- The firewall is updated to allow RDP connections on port 3389
+sudo tee /etc/systemd/system/zerowork.service > /dev/null <<EOF
+[Unit]
+Description=ZeroWork desktop agent
+After=network-online.target
+Wants=network-online.target
 
-#### 5. User Account Setup
+[Service]
+Type=simple
+User=$EXISTING_USER
+Group=$EXISTING_USER
+Environment=DISPLAY=:99
+Environment=HOME=/home/$EXISTING_USER
+WorkingDirectory=/home/$EXISTING_USER
+ExecStart=/usr/local/bin/zerowork-agent-start.sh
+Restart=always
+RestartSec=10
 
-- You'll be prompted to enter a new username for RDP login
-- Type your desired username and press Enter
-- You'll then be asked to create and confirm a password
-  - The password won't be visible as you type (for security)
-  - You must enter the same password twice
+[Install]
+WantedBy=multi-user.target
+EOF
 
-#### 6. Application Installation
+sudo systemctl daemon-reload
+sudo systemctl enable --now zerowork.service
+```
 
-- Google Chrome will be downloaded and installed
-- GDebi package manager will be installed for handling .deb files
-- ZeroWork version 1.1.66 (or your specified version) will be downloaded and installed
+## Troubleshooting
 
-#### 7. Completion
-
-- The script will display a completion message with connection details
-- You'll be asked if you want to delete the installation script
-  - Type `y` to remove it (recommended for security)
-  - Type `n` to keep it
-
-### Connecting to Your Desktop
-
-After successful installation:
-
-1. Use any RDP client software on your local computer
-   - Windows: Built-in Remote Desktop Connection
-   - Mac: Microsoft Remote Desktop from the App Store
-   - Linux: Remmina or similar RDP client
-
-2. Enter your VPS IP address as the connection address
-
-3. When prompted, enter the username and password you created during installation
-
-4. You should now see the XFCE desktop with Google Chrome and ZeroWork installed
-
-### Troubleshooting Tips
-
-- If connection fails, ensure port 3389 is open on your VPS firewall
-- If login fails, double-check the username and password you created
-- For VPS performance issues, ensure your server has at least 2GB of RAM
-
-### Next Steps
-
-Once connected to your desktop environment:
-
-1. Launch Google Chrome from the Applications menu
-2. Open ZeroWork from the Applications menu to begin using the software
-
-The installation process is now complete, and your Ubuntu system is ready with ZeroWork installed.
+- RDP fail: port 3389
+- Login fail: username/password
+- VPS: at least 2GB RAM
+- Agent down: `systemctl status` / `journalctl`

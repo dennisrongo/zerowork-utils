@@ -96,6 +96,70 @@ echo "Installing ZeroWork version $ZEROWORK_VERSION..."
 wget "https://zerowork-agent-releases.s3.amazonaws.com/public/linux/ZeroWork-$ZEROWORK_VERSION.deb"
 sudo apt install "./ZeroWork-$ZEROWORK_VERSION.deb" -y
 
+echo "Installing Xvfb for headless ZeroWork agent..."
+sudo apt install xvfb x11-utils -y
+
+if [ ! -x /opt/ZeroWork/zerowork ]; then
+    echo "Error: /opt/ZeroWork/zerowork is missing or not executable."
+    exit 1
+fi
+
+echo "Writing ZeroWork agent start wrapper..."
+sudo tee /usr/local/bin/zerowork-agent-start.sh > /dev/null <<'EOF'
+#!/bin/bash
+export DISPLAY=:99
+if ! xdpyinfo -display :99 >/dev/null 2>&1; then
+    Xvfb :99 -screen 0 1440x900x24 -ac +extension GLX +render -noreset &
+fi
+for i in $(seq 1 20); do
+    if xdpyinfo -display :99 >/dev/null 2>&1; then
+        break
+    fi
+    sleep 0.5
+done
+if ! xdpyinfo -display :99 >/dev/null 2>&1; then
+    echo "Error: Xvfb display :99 did not become ready."
+    exit 1
+fi
+exec /opt/ZeroWork/zerowork --no-sandbox
+EOF
+
+echo "Writing ZeroWork systemd service..."
+sudo tee /etc/systemd/system/zerowork.service > /dev/null <<EOF
+[Unit]
+Description=ZeroWork desktop agent
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=$new_user
+Group=$new_user
+Environment=DISPLAY=:99
+Environment=HOME=/home/$new_user
+WorkingDirectory=/home/$new_user
+ExecStart=/usr/local/bin/zerowork-agent-start.sh
+Restart=always
+RestartSec=10
+
+[Install]
+WantedBy=multi-user.target
+EOF
+
+sudo chmod +x /usr/local/bin/zerowork-agent-start.sh
+
+echo "Enabling and starting ZeroWork agent service..."
+sudo systemctl daemon-reload
+sudo systemctl enable zerowork.service
+if ! sudo systemctl start zerowork.service; then
+    echo "Error: Failed to start zerowork.service"
+    sudo systemctl status zerowork.service --no-pager || true
+    sudo journalctl -u zerowork.service -n 50 --no-pager || true
+    exit 1
+fi
+
+echo "ZeroWork agent is enabled on boot."
+
 echo "Restarting XRDP service..."
 sudo systemctl restart xrdp
 
@@ -105,6 +169,8 @@ echo "Username: $new_user"
 echo "Password: (You set this during installation)"
 echo "RDP Address: Use your VPS IP address."
 echo "ZeroWork version $ZEROWORK_VERSION has been installed."
+echo "The ZeroWork agent is enabled as systemd service zerowork and starts on boot."
+echo "Check it with: sudo systemctl status zerowork"
 
 # Prompt to delete the script file
 read -p "Do you want to delete the downloaded script file (ubuntu-desktop.sh)? (y/n): " DELETE_FILE
